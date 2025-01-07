@@ -1047,6 +1047,9 @@ video {
 .max-w-\[200px\] {
   max-width: 200px;
 }
+.max-w-\[400px\] {
+  max-width: 400px;
+}
 .flex-1 {
   flex: 1 1 0%;
 }
@@ -1723,6 +1726,10 @@ video {
   --tw-text-opacity: 1;
   color: rgb(244 244 245 / var(--tw-text-opacity, 1));
 }
+.text-gray-400 {
+  --tw-text-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-text-opacity, 1));
+}
 .underline-offset-4 {
   text-underline-offset: 4px;
 }
@@ -2249,6 +2256,10 @@ body {
 
 .group\/menu-item:focus-within .group-focus-within\/menu-item\:opacity-100 {
   opacity: 1;
+}
+
+.group\/file:hover .group-hover\/file\:visible {
+  visibility: visible;
 }
 
 .group:hover .group-hover\:flex {

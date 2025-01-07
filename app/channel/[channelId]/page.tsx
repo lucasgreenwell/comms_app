@@ -5,9 +5,10 @@ import { useParams, useRouter } from 'next/navigation'
 import { getSupabase, getCurrentUser } from '../../auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { LogOut } from 'lucide-react'
+import { LogOut, Paperclip, X } from 'lucide-react'
 import PostItem from './PostItem'
 import ThreadComments from './ThreadComments'
+import { useToast } from "@/components/ui/use-toast"
 
 interface Post {
   id: string
@@ -42,11 +43,17 @@ export default function Channel() {
       email: string;
     };
   } | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchChannel()
     fetchPosts()
-    setupRealtimeSubscription()
+    const cleanup = setupRealtimeSubscription()
+    return () => {
+      cleanup()
+    }
   }, [channelId])
 
   useEffect(() => {
@@ -73,9 +80,17 @@ export default function Channel() {
 
   const setupRealtimeSubscription = () => {
     const supabase = getSupabase()
-    const channel = supabase
-      .channel(`public:posts:channel_id=eq.${channelId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `channel_id=eq.${channelId}` }, (payload) => {
+    let channel = supabase.channel(`public:posts:channel_id=eq.${channelId}`)
+
+    // Listen for post changes
+    channel = channel.on('postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'posts', 
+        filter: `channel_id=eq.${channelId}` 
+      }, 
+      (payload) => {
         if (payload.eventType === 'INSERT') {
           fetchPosts() // Refetch all posts to ensure we have the latest data with user info
         } else if (payload.eventType === 'UPDATE') {
@@ -87,22 +102,103 @@ export default function Channel() {
         } else if (payload.eventType === 'DELETE') {
           setPosts(prevPosts => prevPosts.filter(post => post.id !== payload.old?.id))
         }
-      })
-      .subscribe()
+      }
+    )
+
+    // Listen for file attachment changes
+    if (posts.length > 0) {
+      channel = channel.on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'file_attachments',
+          filter: `post_id=in.(${posts.map(p => p.id).join(',')})`
+        },
+        () => {
+          fetchPosts() // Refetch to get updated file attachments
+        }
+      )
+    }
+
+    // Listen for file changes
+    channel = channel.on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'files'
+      },
+      () => {
+        fetchPosts() // Refetch to get updated file data
+      }
+    )
+
+    channel.subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
   }
 
+  // Re-subscribe when posts change to update the file_attachments filter
+  useEffect(() => {
+    const cleanup = setupRealtimeSubscription()
+    return () => {
+      cleanup()
+    }
+  }, [posts.length])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() && selectedFiles.length === 0) return
 
     try {
       const user = await getCurrentUser()
       if (!user) throw new Error('User not authenticated')
 
+      // First, upload any files
+      const filePromises = selectedFiles.map(async (file) => {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
+
+        // Upload file to storage
+        const { error: uploadError } = await getSupabase().storage
+          .from('file-uploads')
+          .upload(filePath, file)
+
+        if (uploadError) throw uploadError
+
+        // Create file record
+        const { data: fileData, error: fileRecordError } = await getSupabase()
+          .from('files')
+          .insert({
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            bucket: 'file-uploads',
+            path: filePath,
+            uploaded_by: user.id
+          })
+          .select()
+          .single()
+
+        if (fileRecordError) throw fileRecordError
+
+        return fileData
+      })
+
+      const uploadedFiles = await Promise.all(filePromises)
+
+      // Create post
       const response = await fetch('/api/posts', {
         method: 'POST',
         headers: {
@@ -119,10 +215,42 @@ export default function Channel() {
         throw new Error('Failed to send message')
       }
 
+      const postData = await response.json()
+
+      // Create file attachments
+      if (uploadedFiles.length > 0) {
+        const { error: attachmentError } = await getSupabase()
+          .from('file_attachments')
+          .insert(
+            uploadedFiles.map(file => ({
+              file_id: file.id,
+              post_id: postData.id,
+              message_id: null,
+              conversation_thread_comment_id: null
+            }))
+          )
+
+        if (attachmentError) throw attachmentError
+      }
+
       setNewMessage('')
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully."
+      })
     } catch (error) {
       console.error('Error sending message:', error)
       setError('Failed to send message')
+      toast({
+        variant: "destructive",
+        title: "Error sending message",
+        description: "There was an error sending your message. Please try again."
+      })
     }
   }
 
@@ -204,17 +332,50 @@ export default function Channel() {
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <form onSubmit={handleSendMessage} className="flex gap-4 w-full min-w-0">
-          <div className="flex-1 min-w-0">
+        <form onSubmit={handleSendMessage} className="space-y-2">
+          <div className="flex gap-2">
             <Input
               type="text"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
-              className="w-full"
+              className="flex-1"
             />
+            <Button 
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button type="submit">Send</Button>
           </div>
-          <Button type="submit" className="shrink-0">Send</Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            multiple
+          />
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={() => removeFile(index)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </form>
       </div>
       {activeThread && (

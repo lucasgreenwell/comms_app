@@ -20,10 +20,26 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Fetch posts
+    // Fetch posts with file attachments
     const { data: posts, error: postsError } = await supabase
       .from('posts')
-      .select('id, user_id, channel_id, content, created_at')
+      .select(`
+        id, 
+        user_id, 
+        channel_id, 
+        content, 
+        created_at,
+        file_attachments (
+          file_id,
+          files (
+            id,
+            file_name,
+            file_type,
+            file_size,
+            path
+          )
+        )
+      `)
       .eq('channel_id', channelId)
       .order('created_at', { ascending: true })
 
@@ -31,16 +47,18 @@ export async function GET(request: Request) {
 
     // Fetch user data
     const userIds = [...new Set(posts.map(post => post.user_id))]
-    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
-      filter: `id.in.(${userIds.join(',')})`
-    })
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, email')
+      .in('id', userIds)
 
     if (usersError) throw usersError
 
-    // Combine post data with user data
+    // Transform posts to include files array
     const postsWithUserInfo = posts.map(post => ({
       ...post,
-      user: users.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User' }
+      user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User' },
+      files: post.file_attachments?.map(attachment => attachment.files) || []
     }))
 
     return NextResponse.json(postsWithUserInfo)
@@ -55,21 +73,28 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { channelId, userId, content } = body
 
-    if (!channelId || !userId || !content) {
+    if (!channelId || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    // Only create post if there's content or files will be attached
+    if (!content?.trim() && !body.files?.length) {
+      return NextResponse.json({ error: 'Post must have content or files' }, { status: 400 })
+    }
+
+    const { data: post, error } = await supabase
       .from('posts')
       .insert({
         channel_id: channelId,
         user_id: userId,
-        content: content.trim()
+        content: content?.trim() || ''
       })
+      .select()
+      .single()
 
     if (error) throw error
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(post)
   } catch (error) {
     console.error('Error creating post:', error)
     return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
