@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { getSupabase, getCurrentUser } from '../../auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { LogOut } from 'lucide-react'
+import PostItem from './PostItem'
 
 interface Post {
   id: string
@@ -18,6 +20,11 @@ interface Post {
   }
 }
 
+interface Channel {
+  id: string
+  name: string
+}
+
 export default function Channel() {
   const { channelId } = useParams()
   const [posts, setPosts] = useState<Post[]>([])
@@ -25,8 +32,11 @@ export default function Channel() {
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [channel, setChannel] = useState<Channel | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
+    fetchChannel()
     fetchPosts()
     setupRealtimeSubscription()
   }, [channelId])
@@ -105,29 +115,81 @@ export default function Channel() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
+  const fetchChannel = async () => {
+    try {
+      const supabase = getSupabase()
+      const { data, error } = await supabase
+        .from('channels')
+        .select('id, name')
+        .eq('id', channelId)
+        .single()
+
+      if (error) throw error
+      setChannel(data)
+    } catch (error) {
+      console.error('Error fetching channel:', error)
+      setError('Failed to fetch channel details')
+    }
+  }
+
+  const handleLeaveChannel = async () => {
+    try {
+      const user = await getCurrentUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('channel_members')
+        .delete()
+        .eq('channel_id', channelId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      router.push('/') // Redirect to home page after leaving
+    } catch (error) {
+      console.error('Error leaving channel:', error)
+      setError('Failed to leave channel')
+    }
+  }
+
   if (loading) return <div>Loading posts...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
-    <div className="flex flex-col h-full p-4">
-      <h1 className="text-2xl font-bold mb-4">Channel: {channelId}</h1>
-      <div className="flex-1 overflow-y-auto mb-4">
-        {posts.map((post) => (
-          <div key={post.id} className="mb-2">
-            <strong>{post.user.email}:</strong> {post.content}
-          </div>
-        ))}
-        <div ref={messagesEndRef} />
+    <div className="flex flex-col h-full p-4 max-w-[1200px] mx-auto w-full">
+      <div className="flex justify-between items-center mb-4 w-full min-w-0">
+        <h1 className="text-2xl font-bold truncate">
+          # {channel?.name || 'Loading...'}
+        </h1>
+        <Button 
+          variant="ghost" 
+          size="sm"
+          onClick={handleLeaveChannel}
+          className="text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0 ml-4"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Leave Channel
+        </Button>
       </div>
-      <form onSubmit={handleSendMessage} className="flex gap-2">
-        <Input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type your message..."
-          className="flex-1"
-        />
-        <Button type="submit">Send</Button>
+      <div className="flex-1 overflow-y-auto mb-4 w-full min-w-0">
+        <div className="flex flex-col w-full min-w-0">
+          {posts.map((post) => (
+            <PostItem key={post.id} post={post} onPostUpdate={fetchPosts} />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+      <form onSubmit={handleSendMessage} className="flex gap-4 w-full min-w-0">
+        <div className="flex-1 min-w-0">
+          <Input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder="Type your message..."
+            className="w-full"
+          />
+        </div>
+        <Button type="submit" className="shrink-0">Send</Button>
       </form>
     </div>
   )

@@ -17,24 +17,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const checkSession = async () => {
       try {
-        console.log('📱 Layout - Checking session')
         const { data: { session: currentSession } } = await supabase.auth.getSession()
-        console.log('📱 Layout - Session check result:', {
-          hasSession: !!currentSession,
-          pathname,
-          timestamp: new Date().toISOString()
-        })
-
         setSession(currentSession)
 
         // Handle authentication routing
         if (currentSession) {
           if (pathname === '/login' || pathname === '/signup') {
-            console.log('📱 Layout - Redirecting to home from auth page')
             router.replace('/')
           }
         } else if (!pathname?.startsWith('/login') && !pathname?.startsWith('/signup')) {
-          console.log('📱 Layout - Redirecting to login')
           router.replace('/login')
         }
       } catch (error) {
@@ -47,7 +38,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     checkSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('📱 Layout - Auth state change:', { event, hasSession: !!session })
       setSession(session)
       
       // Handle auth state changes
@@ -94,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SidebarProvider>
           <div className="flex h-screen">
             {session && <Sidebar />}
-            <main className="flex-1 overflow-auto">
+            <main className="flex-1 overflow-auto min-w-[80vw]">
               {children}
             </main>
           </div>
@@ -103,7 +93,5 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
-
-
 
 import './globals.css'

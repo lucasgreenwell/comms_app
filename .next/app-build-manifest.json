@@ -1,9 +1,9 @@
 {
   "pages": {
-    "/profile/page": [
+    "/dm/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/profile/page.js"
+      "static/chunks/app/dm/[id]/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
