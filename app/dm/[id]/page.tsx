@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import MessageItem from '../../components/MessageItem'
+import MessageItem from '../MessageItem'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface Message {

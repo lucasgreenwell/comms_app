@@ -80,6 +80,20 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
     }
   }
 
+  const handleCancel = () => {
+    setIsEditing(false)
+    setEditedContent(post.content)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleEdit()
+    } else if (e.key === 'Escape') {
+      handleCancel()
+    }
+  }
+
   if (isEditing) {
     return (
       <div className="flex flex-col gap-2 mb-2 p-2 bg-gray-50 rounded">
@@ -90,17 +104,21 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
           <textarea
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
+            onKeyDown={handleKeyDown}
             className="flex-1 min-h-[100px] p-2 border rounded resize-y"
             autoFocus
           />
           <div className="flex flex-col gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+            <Button size="sm" variant="ghost" onClick={handleCancel}>
               <X className="h-4 w-4" />
             </Button>
             <Button size="sm" variant="ghost" onClick={handleEdit}>
               <Check className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+        <div className="mt-1 text-xs text-gray-500">
+          Press Enter to save, Escape to cancel
         </div>
       </div>
     )

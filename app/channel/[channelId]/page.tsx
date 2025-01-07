@@ -78,6 +78,14 @@ export default function Channel() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `channel_id=eq.${channelId}` }, (payload) => {
         if (payload.eventType === 'INSERT') {
           fetchPosts() // Refetch all posts to ensure we have the latest data with user info
+        } else if (payload.eventType === 'UPDATE') {
+          setPosts(prevPosts => 
+            prevPosts.map(post => 
+              post.id === payload.new.id ? { ...post, ...payload.new } : post
+            )
+          )
+        } else if (payload.eventType === 'DELETE') {
+          setPosts(prevPosts => prevPosts.filter(post => post.id !== payload.old?.id))
         }
       })
       .subscribe()
