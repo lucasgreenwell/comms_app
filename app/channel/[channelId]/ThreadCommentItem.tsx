@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Edit2, Trash2, X, Check, Download, FileIcon } from 'lucide-react'
 import { getCurrentUser, getSupabase } from '../../auth'
 import { useToast } from "@/components/ui/use-toast"
+import { themes } from '../../config/themes'
 
 interface ThreadComment {
   id: string
@@ -33,10 +34,24 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(comment.content)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
+    }
+    return themes[0]
+  })
   const { toast } = useToast()
 
   useEffect(() => {
     getCurrentUser().then(user => setCurrentUser(user))
+
+    const handleStorageChange = () => {
+      const themeId = localStorage.getItem('slack-clone-theme')
+      setTheme(themes.find(t => t.id === themeId) || themes[0])
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   const isOwner = currentUser?.id === comment.user_id
@@ -176,7 +191,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
 
   if (isEditing) {
     return (
-      <div className="bg-gray-50 p-3 rounded">
+      <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
         <div className="font-bold">{comment.user.email}</div>
         <div className="mt-2 flex gap-2">
           <Input
@@ -184,7 +199,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1"
+            className="flex-1 bg-white"
             autoFocus
           />
           <Button size="sm" variant="ghost" onClick={handleCancel}>
@@ -202,17 +217,17 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
   }
 
   return (
-    <div className="bg-gray-50 p-3 rounded group">
+    <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200`}>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className="font-bold">{comment.user.email}</div>
-          <div>{comment.content}</div>
+          <div className={`font-bold ${theme.colors.foreground}`}>{comment.user.email}</div>
+          <div className={theme.colors.foreground}>{comment.content}</div>
           {comment.files && comment.files.length > 0 && (
             <div className="mt-2 space-y-2">
               {comment.files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[300px]"
+                  className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[300px] hover:bg-gray-50 transition-colors"
                 >
                   <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -245,11 +260,21 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
           )}
         </div>
         {isOwner && (
-          <div className="hidden group-hover:flex gap-1 flex-shrink-0">
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
+          <div className="flex gap-1 flex-shrink-0">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={() => setIsEditing(true)}
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <Edit2 className="h-4 w-4" />
             </Button>
-            <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={handleDelete}
+            >
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>

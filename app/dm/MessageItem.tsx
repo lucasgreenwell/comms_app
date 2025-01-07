@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Edit2, Trash2, X, Check, MessageSquare, Download, FileIcon } from 'lucide-react';
+import { themes } from '../config/themes';
 
 interface MessageItemProps {
   message: {
@@ -40,9 +41,23 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
   const [editedContent, setEditedContent] = useState(message.content);
   const { toast } = useToast();
   const [threadCount, setThreadCount] = useState(0);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
+    }
+    return themes[0]
+  });
 
   useEffect(() => {
     fetchThreadCount();
+
+    const handleStorageChange = () => {
+      const themeId = localStorage.getItem('slack-clone-theme')
+      setTheme(themes.find(t => t.id === themeId) || themes[0])
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, []);
 
   const canEditOrDelete = currentUser && message.sender.id === currentUser.id;
@@ -213,7 +228,7 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
 
   if (isEditing) {
     return (
-      <div className="p-2 rounded bg-gray-100">
+      <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
         <div className="font-bold flex items-center">
           {message.sender.email}
           {onlineUsers.has(message.sender.id) && (
@@ -235,7 +250,7 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1"
+            className="flex-1 bg-white"
             autoFocus
           />
           <Button size="sm" variant="ghost" onClick={handleCancel}>
@@ -253,81 +268,93 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
   }
 
   return (
-    <div className="p-2 rounded bg-gray-100 flex justify-between items-start group">
-      <div className="flex-1">
-        <p className="font-bold flex items-center">
-          {message.sender.email}
-          {onlineUsers.has(message.sender.id) && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <span className="ml-2 text-green-500">●</span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Online</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-        </p>
-        <p>{message.content}</p>
-        {message.files && message.files.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {message.files.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center gap-2 bg-white p-2 rounded border group/file"
-              >
-                <FileIcon className="h-4 w-4 text-gray-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{file.file_name}</p>
-                  <p className="text-xs text-gray-500">{formatFileSize(file.file_size)}</p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-blue-500"
-                    onClick={() => handleDownload(file)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  {canEditOrDelete && (
+    <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200`}>
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <p className={`font-bold flex items-center ${theme.colors.foreground}`}>
+            {message.sender.email}
+            {onlineUsers.has(message.sender.id) && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <span className="ml-2 text-green-500">●</span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Online</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </p>
+          <p className={theme.colors.foreground}>{message.content}</p>
+          {message.files && message.files.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {message.files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-2 bg-white p-2 rounded border group/file hover:bg-gray-50 transition-colors"
+                >
+                  <FileIcon className="h-4 w-4 text-gray-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{file.file_name}</p>
+                    <p className="text-xs text-gray-500">{formatFileSize(file.file_size)}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity"
-                      onClick={() => handleFileDelete(file)}
+                      className="text-blue-500"
+                      onClick={() => handleDownload(file)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Download className="h-4 w-4" />
                     </Button>
-                  )}
+                    {canEditOrDelete && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity"
+                        onClick={() => handleFileDelete(file)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="hidden group-hover:flex gap-1">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onClick={() => onThreadOpen(message)}
-          className="flex items-center gap-1"
-        >
-          <MessageSquare className="h-4 w-4" />
-          {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
-        </Button>
-        {canEditOrDelete && (
-          <>
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex gap-1">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => onThreadOpen(message)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+          >
+            <MessageSquare className="h-4 w-4" />
+            {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+          </Button>
+          {canEditOrDelete && (
+            <>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setIsEditing(true)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

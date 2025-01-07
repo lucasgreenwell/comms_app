@@ -6,6 +6,7 @@ import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { X, Paperclip } from 'lucide-react'
 import ConversationThreadCommentItem from '../dm/ConversationThreadCommentItem'
 import { useToast } from '@/components/ui/use-toast'
+import { themes } from '../config/themes'
 
 interface ThreadComment {
   id: string
@@ -47,6 +48,22 @@ export default function ConversationThreadComments({ messageId, conversationId, 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
+    }
+    return themes[0]
+  })
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const themeId = localStorage.getItem('slack-clone-theme')
+      setTheme(themes.find(t => t.id === themeId) || themes[0])
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
 
   useEffect(() => {
     fetchComments()
@@ -261,8 +278,8 @@ export default function ConversationThreadComments({ messageId, conversationId, 
         </Button>
       </div>
 
-      <div className="p-4 border-b bg-gray-50">
-        <div className="font-bold">{originalMessage.sender.email}</div>
+      <div className={`${theme.colors.background} p-4 border-b ${theme.colors.foreground}`}>
+        <div className={`font-bold ${theme.colors.foreground}`}>{originalMessage.sender.email}</div>
         <div>{originalMessage.content}</div>
       </div>
       

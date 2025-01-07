@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Edit2, Trash2, X, Check, MessageSquare, Download, FileIcon } from 'lucide-react'
 import { getCurrentUser, getSupabase } from '../../auth'
 import { useToast } from "@/components/ui/use-toast"
+import { themes } from '../../config/themes'
 
 interface Post {
   id: string
@@ -32,11 +33,25 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
   const [editedContent, setEditedContent] = useState(post.content)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [threadCount, setThreadCount] = useState(0)
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
+    }
+    return themes[0]
+  })
   const { toast } = useToast()
 
   useEffect(() => {
     getCurrentUser().then(user => setCurrentUser(user))
     fetchThreadCount()
+
+    const handleStorageChange = () => {
+      const themeId = localStorage.getItem('slack-clone-theme')
+      setTheme(themes.find(t => t.id === themeId) || themes[0])
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
   const isOwner = currentUser?.id === post.user_id
@@ -191,16 +206,16 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
 
   if (isEditing) {
     return (
-      <div className="flex flex-col gap-2 mb-2 p-2 bg-gray-50 rounded">
+      <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
         <div className="flex items-center">
-          <strong>{post.user.email}:</strong>
+          <strong>{post.user.email}</strong>
         </div>
-        <div className="flex gap-2">
+        <div className="mt-2 flex gap-2">
           <textarea
             value={editedContent}
             onChange={(e) => setEditedContent(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="flex-1 min-h-[100px] p-2 border rounded resize-y"
+            className="flex-1 min-h-[100px] p-2 border rounded resize-y bg-white"
             autoFocus
           />
           <div className="flex flex-col gap-2">
@@ -220,66 +235,79 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
   }
 
   return (
-    <div className="flex gap-2 items-start mb-2 group">
-      <div className="flex-1 min-w-0">
-        <strong>{post.user.email}:</strong> {post.content}
-        {post.files && post.files.length > 0 && (
-          <div className="mt-2 space-y-2">
-            {post.files.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[400px]"
-              >
-                <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{file.file_name}</div>
-                  <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-blue-500 h-8 w-8 p-0"
-                    onClick={() => handleDownload(file)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                  {isOwner && (
+    <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group mb-4 hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200`}>
+      <div className="flex justify-between items-start">
+        <div className="flex-1 min-w-0">
+          <div className={`font-bold ${theme.colors.foreground}`}>{post.user.email}</div>
+          <div className={theme.colors.foreground}>{post.content}</div>
+          {post.files && post.files.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {post.files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[400px] hover:bg-gray-50 transition-colors"
+                >
+                  <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{file.file_name}</div>
+                    <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity h-8 w-8 p-0"
-                      onClick={() => handleFileDelete(file)}
+                      className="text-blue-500 h-8 w-8 p-0"
+                      onClick={() => handleDownload(file)}
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Download className="h-4 w-4" />
                     </Button>
-                  )}
+                    {isOwner && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity h-8 w-8 p-0"
+                        onClick={() => handleFileDelete(file)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          onClick={() => onThreadOpen(post)}
-          className="hidden group-hover:flex items-center gap-1"
-        >
-          <MessageSquare className="h-4 w-4" />
-          {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
-        </Button>
-        {isOwner && (
-          <div className="hidden group-hover:flex gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-              <Edit2 className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => onThreadOpen(post)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+          >
+            <MessageSquare className="h-4 w-4" />
+            {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+          </Button>
+          {isOwner && (
+            <div className="flex gap-1">
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => setIsEditing(true)}
+                className="opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
