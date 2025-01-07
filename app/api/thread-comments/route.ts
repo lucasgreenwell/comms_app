@@ -20,10 +20,26 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Fetch thread comments with user info
+    // Fetch thread comments with file attachments
     const { data: comments, error: commentsError } = await supabase
       .from('post_thread_comments')
-      .select('id, user_id, post_id, content, created_at')
+      .select(`
+        id, 
+        user_id, 
+        post_id, 
+        content, 
+        created_at,
+        file_attachments (
+          file_id,
+          files (
+            id,
+            file_name,
+            file_type,
+            file_size,
+            path
+          )
+        )
+      `)
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
 
@@ -31,16 +47,18 @@ export async function GET(request: Request) {
 
     // Fetch user data
     const userIds = [...new Set(comments.map(comment => comment.user_id))]
-    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
-      filter: `id.in.(${userIds.join(',')})`
-    })
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, email')
+      .in('id', userIds)
 
     if (usersError) throw usersError
 
-    // Combine comment data with user data
+    // Transform comments to include files array
     const commentsWithUserInfo = comments.map(comment => ({
       ...comment,
-      user: users.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User' }
+      user: users?.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User' },
+      files: comment.file_attachments?.map(attachment => attachment.files) || []
     }))
 
     return NextResponse.json(commentsWithUserInfo)
@@ -55,21 +73,28 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { postId, userId, content } = body
 
-    if (!postId || !userId || !content) {
+    if (!postId || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    // Only create comment if there's content or files will be attached
+    if (!content?.trim() && !body.files?.length) {
+      return NextResponse.json({ error: 'Comment must have content or files' }, { status: 400 })
+    }
+
+    const { data: comment, error } = await supabase
       .from('post_thread_comments')
       .insert({
         post_id: postId,
         user_id: userId,
-        content: content.trim()
+        content: content?.trim() || ''
       })
+      .select()
+      .single()
 
     if (error) throw error
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(comment)
   } catch (error) {
     console.error('Error creating thread comment:', error)
     return NextResponse.json({ error: 'Failed to create thread comment' }, { status: 500 })

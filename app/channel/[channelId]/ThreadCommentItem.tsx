@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Edit2, Trash2, X, Check } from 'lucide-react'
+import { Edit2, Trash2, X, Check, Download, FileIcon } from 'lucide-react'
 import { getCurrentUser, getSupabase } from '../../auth'
+import { useToast } from "@/components/ui/use-toast"
 
 interface ThreadComment {
   id: string
@@ -14,6 +15,13 @@ interface ThreadComment {
     id: string
     email: string
   }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+  }[]
 }
 
 interface ThreadCommentItemProps {
@@ -25,6 +33,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(comment.content)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     getCurrentUser().then(user => setCurrentUser(user))
@@ -79,6 +88,92 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
     }
   }
 
+  const handleDownload = async (file: { path: string; file_name: string }) => {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.storage
+        .from('file-uploads')
+        .download(file.path);
+
+      if (error) throw error;
+
+      // Create a download link
+      const url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.file_name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "File downloaded",
+        description: `${file.file_name} has been downloaded successfully.`
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        variant: "destructive",
+        title: "Error downloading file",
+        description: "There was an error downloading the file. Please try again."
+      });
+    }
+  };
+
+  const handleFileDelete = async (file: { id: string; path: string }) => {
+    if (!currentUser || comment.user_id !== currentUser.id) return;
+
+    try {
+      const supabase = getSupabase();
+
+      // Delete the file from storage
+      const { error: storageError } = await supabase.storage
+        .from('file-uploads')
+        .remove([file.path]);
+
+      if (storageError) throw storageError;
+
+      // Delete the file attachment record
+      const { error: attachmentError } = await supabase
+        .from('file_attachments')
+        .delete()
+        .eq('file_id', file.id);
+
+      if (attachmentError) throw attachmentError;
+
+      // Delete the file record
+      const { error: fileError } = await supabase
+        .from('files')
+        .delete()
+        .eq('id', file.id);
+
+      if (fileError) throw fileError;
+
+      toast({
+        title: "File deleted",
+        description: "The file has been successfully deleted."
+      });
+      
+      onCommentUpdate();
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      toast({
+        variant: "destructive",
+        title: "Error deleting file",
+        description: "There was an error deleting the file. Please try again."
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   if (isEditing) {
     return (
       <div className="bg-gray-50 p-3 rounded">
@@ -109,12 +204,48 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
   return (
     <div className="bg-gray-50 p-3 rounded group">
       <div className="flex justify-between items-start">
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="font-bold">{comment.user.email}</div>
           <div>{comment.content}</div>
+          {comment.files && comment.files.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {comment.files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[300px]"
+                >
+                  <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{file.file_name}</div>
+                    <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-blue-500 h-8 w-8 p-0"
+                      onClick={() => handleDownload(file)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    {isOwner && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity h-8 w-8 p-0"
+                        onClick={() => handleFileDelete(file)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         {isOwner && (
-          <div className="hidden group-hover:flex gap-1">
+          <div className="hidden group-hover:flex gap-1 flex-shrink-0">
             <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
               <Edit2 className="h-4 w-4" />
             </Button>

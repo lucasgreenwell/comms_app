@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getCurrentUser, getSupabase } from '../../auth'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { X } from 'lucide-react'
+import { X, Paperclip } from 'lucide-react'
 import ThreadCommentItem from './ThreadCommentItem'
+import { useToast } from "@/components/ui/use-toast"
 
 interface ThreadComment {
   id: string
@@ -16,6 +17,13 @@ interface ThreadComment {
     id: string
     email: string
   }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+  }[]
 }
 
 interface ThreadCommentsProps {
@@ -34,10 +42,16 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
   const [newComment, setNewComment] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchComments()
-    setupRealtimeSubscription()
+    const cleanup = setupRealtimeSubscription()
+    return () => {
+      cleanup()
+    }
   }, [postId])
 
   const fetchComments = async () => {
@@ -58,9 +72,17 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
 
   const setupRealtimeSubscription = () => {
     const supabase = getSupabase()
-    const channel = supabase
-      .channel(`public:post_thread_comments:post_id=eq.${postId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'post_thread_comments', filter: `post_id=eq.${postId}` }, (payload: RealtimePostgresChangesPayload<ThreadComment>) => {
+    let channel = supabase.channel(`public:post_thread_comments:post_id=eq.${postId}`)
+
+    // Listen for comment changes
+    channel = channel.on('postgres_changes', 
+      { 
+        event: '*', 
+        schema: 'public', 
+        table: 'post_thread_comments', 
+        filter: `post_id=eq.${postId}` 
+      }, 
+      (payload: RealtimePostgresChangesPayload<ThreadComment>) => {
         if (payload.eventType === 'INSERT') {
           fetchComments()
         } else if (payload.eventType === 'UPDATE') {
@@ -74,22 +96,103 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
             prevComments.filter(comment => comment.id !== payload.old?.id)
           )
         }
-      })
-      .subscribe()
+      }
+    )
+
+    // Listen for file attachment changes
+    if (comments.length > 0) {
+      channel = channel.on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'file_attachments',
+          filter: `post_thread_comment_id=in.(${comments.map(c => c.id).join(',')})`
+        },
+        () => {
+          fetchComments()
+        }
+      )
+    }
+
+    // Listen for file changes
+    channel = channel.on('postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'files'
+      },
+      () => {
+        fetchComments()
+      }
+    )
+
+    channel.subscribe()
 
     return () => {
       supabase.removeChannel(channel)
     }
   }
 
+  // Re-subscribe when comments change to update the file_attachments filter
+  useEffect(() => {
+    const cleanup = setupRealtimeSubscription()
+    return () => {
+      cleanup()
+    }
+  }, [comments.length])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    setSelectedFiles(prev => [...prev, ...files])
+  }
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newComment.trim()) return
+    if (!newComment.trim() && selectedFiles.length === 0) return
 
     try {
       const user = await getCurrentUser()
       if (!user) throw new Error('User not authenticated')
 
+      // First, upload any files
+      const filePromises = selectedFiles.map(async (file) => {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
+
+        // Upload file to storage
+        const { error: uploadError } = await getSupabase().storage
+          .from('file-uploads')
+          .upload(filePath, file)
+
+        if (uploadError) throw uploadError
+
+        // Create file record
+        const { data: fileData, error: fileRecordError } = await getSupabase()
+          .from('files')
+          .insert({
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            bucket: 'file-uploads',
+            path: filePath,
+            uploaded_by: user.id
+          })
+          .select()
+          .single()
+
+        if (fileRecordError) throw fileRecordError
+
+        return fileData
+      })
+
+      const uploadedFiles = await Promise.all(filePromises)
+
+      // Create comment
       const response = await fetch('/api/thread-comments', {
         method: 'POST',
         headers: {
@@ -106,10 +209,42 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
         throw new Error('Failed to send comment')
       }
 
+      const commentData = await response.json()
+
+      // Create file attachments
+      if (uploadedFiles.length > 0) {
+        const { error: attachmentError } = await getSupabase()
+          .from('file_attachments')
+          .insert(
+            uploadedFiles.map(file => ({
+              file_id: file.id,
+              post_thread_comment_id: commentData.id,
+              message_id: null,
+              post_id: null
+            }))
+          )
+
+        if (attachmentError) throw attachmentError
+      }
+
       setNewComment('')
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+
+      toast({
+        title: "Comment sent",
+        description: "Your comment has been sent successfully."
+      })
     } catch (error) {
       console.error('Error sending comment:', error)
       setError('Failed to send comment')
+      toast({
+        variant: "destructive",
+        title: "Error sending comment",
+        description: "There was an error sending your comment. Please try again."
+      })
     }
   }
 
@@ -140,15 +275,50 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <Input
-          type="text"
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Reply to thread..."
-          className="w-full mb-2"
+      <form onSubmit={handleSubmit} className="p-4 border-t space-y-2">
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Reply to thread..."
+            className="flex-1"
+          />
+          <Button 
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <Button type="submit">Reply</Button>
+        </div>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          className="hidden"
+          multiple
         />
-        <Button type="submit" className="w-full">Reply</Button>
+        {selectedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-4 w-4 p-0"
+                  onClick={() => removeFile(index)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
       </form>
     </div>
   )
