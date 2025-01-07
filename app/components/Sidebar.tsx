@@ -300,7 +300,7 @@ export default function Sidebar() {
   return (
     <aside className={`w-64 ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
       <h2 className="text-xl font-bold mb-4">Channels</h2>
-      <ul className="mb-2 overflow-y-auto max-h-[200px]">
+      <ul className="mb-2 overflow-y-auto max-h-[150px]">
         {channels.map((channel) => (
           <li key={channel.id} className="mb-2">
             <Link 
@@ -313,7 +313,7 @@ export default function Sidebar() {
         ))}
       </ul>
 
-      <div className="space-y-1 mb-auto border-t pt-2">
+      <div className="space-y-1 border-t pt-2">
         <Button 
           variant="ghost" 
           className="w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80"
@@ -372,7 +372,7 @@ export default function Sidebar() {
         </Dialog>
       </div>
 
-      <div className="mt-8">
+      <div className="border-t pt-2 mt-8 flex-1 flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Direct Messages</h2>
           <button
@@ -382,7 +382,7 @@ export default function Sidebar() {
             <Plus className="h-5 w-5" />
           </button>
         </div>
-        <ul className="mb-2 overflow-y-auto max-h-[200px]">
+        <ul className="mb-2 overflow-y-auto flex-1">
           {directMessages.map((dm) => (
             <li key={dm.conversation_id} className="mb-2">
               <Link 
