@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getSupabase } from '../../auth'
 import { usePresence } from '../../hooks/usePresence'
 import {
@@ -10,8 +10,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import MessageItem from '../MessageItem'
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import ConversationThreadComments from '../ConversationThreadComments'
+import { Paperclip, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useToast } from "@/components/ui/use-toast"
 
 interface Message {
   id: string
@@ -21,6 +24,13 @@ interface Message {
     id: string
     email: string
   }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+  }[]
 }
 
 interface Conversation {
@@ -48,6 +58,9 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
       email: string;
     };
   } | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMessages()
@@ -110,6 +123,57 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     }
   }, [params.id])
 
+  // File subscriptions
+  useEffect(() => {
+    if (messages.length === 0) return;
+
+    const messageIds = messages.map(m => m.id);
+    const fileIds = messages.flatMap(m => m.files || []).map(f => f.id);
+
+    if (messageIds.length === 0 && fileIds.length === 0) return;
+
+    const supabase = getSupabase();
+    const channel = supabase.channel(`files:${params.id}`);
+
+    // Only set up file_attachments subscription if we have messages
+    if (messageIds.length > 0) {
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'file_attachments',
+          filter: `message_id=in.(${messageIds.join(',')})`
+        },
+        (payload) => {
+          fetchMessages();
+        }
+      );
+    }
+
+    // Only set up files subscription if we have files
+    if (fileIds.length > 0) {
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'files',
+          filter: `id=in.(${fileIds.join(',')})`
+        },
+        (payload) => {
+          fetchMessages();
+        }
+      );
+    }
+
+    channel.subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [params.id, messages]);
+
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = getSupabase()
@@ -163,6 +227,30 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
 
   const fetchMessages = async () => {
     const supabase = getSupabase()
+    
+    type DbMessage = {
+      id: string;
+      content: string;
+      created_at: string;
+      sender: {
+        id: string;
+        email: string;
+      } | {
+        id: string;
+        email: string;
+      }[];
+      files: {
+        id: string;
+        file: {
+          id: string;
+          file_name: string;
+          file_type: string;
+          file_size: number;
+          path: string;
+        };
+      }[] | null;
+    }
+
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -172,6 +260,16 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         sender:sender_id(
           id,
           email
+        ),
+        files:file_attachments(
+          id,
+          file:file_id(
+            id,
+            file_name,
+            file_type,
+            file_size,
+            path
+          )
         )
       `)
       .eq('conversation_id', params.id)
@@ -183,38 +281,121 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     }
 
     // Transform the data to handle the array structure from Supabase
-    const transformedMessages = data?.map(msg => ({
-      ...msg,
-      sender: Array.isArray(msg.sender) ? msg.sender[0] : msg.sender
+    const transformedMessages = (data as unknown as DbMessage[])?.map(msg => ({
+      id: msg.id,
+      content: msg.content,
+      created_at: msg.created_at,
+      sender: Array.isArray(msg.sender) ? msg.sender[0] : msg.sender,
+      files: msg.files?.map(f => ({
+        id: f.file.id,
+        file_name: f.file.file_name,
+        file_type: f.file.file_type,
+        file_size: f.file.file_size,
+        path: f.file.path
+      }))
     })) || []
 
-    setMessages(transformedMessages as Message[])
+    setMessages(transformedMessages)
   }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() && selectedFiles.length === 0) return
 
     const supabase = getSupabase()
     const { data: { user } } = await supabase.auth.getUser()
     
     if (!user) return
 
-    const { error } = await supabase
-      .from('messages')
-      .insert({
-        content: newMessage,
-        conversation_id: params.id,
-        sender_id: user.id
+    try {
+      // First, upload any files
+      const filePromises = selectedFiles.map(async (file) => {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+        const filePath = `${user.id}/${fileName}`
+
+        // Upload file to storage
+        const { error: uploadError } = await supabase.storage
+          .from('file-uploads')
+          .upload(filePath, file)
+
+        if (uploadError) throw uploadError
+
+        // Create file record
+        const { data: fileData, error: fileRecordError } = await supabase
+          .from('files')
+          .insert({
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            bucket: 'file-uploads',
+            path: filePath,
+            uploaded_by: user.id
+          })
+          .select()
+          .single()
+
+        if (fileRecordError) throw fileRecordError
+
+        return fileData
       })
 
-    if (error) {
-      console.error('Error sending message:', error)
-      return
-    }
+      const uploadedFiles = await Promise.all(filePromises)
 
-    setNewMessage('')
-    fetchMessages()
+      // Create message
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          content: newMessage.trim(),
+          conversation_id: params.id,
+          sender_id: user.id
+        })
+        .select()
+        .single()
+
+      if (messageError) throw messageError
+
+      // Create file attachments
+      if (uploadedFiles.length > 0) {
+        const { error: attachmentError } = await supabase
+          .from('file_attachments')
+          .insert(
+            uploadedFiles.map(file => ({
+              file_id: file.id,
+              message_id: messageData.id
+            }))
+          )
+
+        if (attachmentError) throw attachmentError
+      }
+
+      setNewMessage('')
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully."
+      })
+    } catch (error) {
+      console.error('Error sending message:', error)
+      toast({
+        variant: "destructive",
+        title: "Error sending message",
+        description: "There was an error sending your message. Please try again."
+      })
+    }
   }
 
   return (
@@ -278,20 +459,52 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             />
           ))}
         </div>
-        <form onSubmit={sendMessage} className="flex gap-2">
+        <form onSubmit={sendMessage} className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              className="flex-1 p-2 border rounded"
+              placeholder="Type your message..."
+            />
+            <Button 
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Button type="submit">
+              Send
+            </Button>
+          </div>
           <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            className="flex-1 p-2 border rounded"
-            placeholder="Type your message..."
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            className="hidden"
+            multiple
           />
-          <button 
-            type="submit" 
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Send
-          </button>
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-sm">{file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={() => removeFile(index)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </form>
       </div>
       {activeThread && (

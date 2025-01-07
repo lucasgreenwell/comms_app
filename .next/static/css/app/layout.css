@@ -2254,6 +2254,10 @@ body {
   opacity: 1;
 }
 
+.group\/file:hover .group-hover\/file\:opacity-100 {
+  opacity: 1;
+}
+
 .group.destructive .group-\[\.destructive\]\:border-muted\/40 {
   border-color: hsl(var(--muted) / 0.4);
 }
