@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip"
 import MessageItem from '../MessageItem'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import ConversationThreadComments from '../ConversationThreadComments'
 
 interface Message {
   id: string
@@ -40,6 +41,13 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [newMessage, setNewMessage] = useState('')
   const { onlineUsers } = usePresence()
   const [user, setUser] = useState<{ id: string } | null>(null)
+  const [activeThread, setActiveThread] = useState<{
+    messageId: string;
+    content: string;
+    sender: {
+      email: string;
+    };
+  } | null>(null);
 
   useEffect(() => {
     fetchMessages()
@@ -210,75 +218,90 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   }
 
   return (
-    <div className="flex-1 p-4">
-      <h1 className="text-2xl font-bold mb-4">
-        {conversation?.type === 'dm' ? (
-          <div className="flex items-center">
-            Chat with {participants[0]?.email}
-            {participants[0] && onlineUsers.has(participants[0].id) && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <span className="ml-2 text-green-500">●</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Online</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        ) : (
-          <div>
-            <div>{conversation?.name || 'Group Chat'}</div>
-            <div className="text-sm font-normal text-gray-500">
-              {participants.map((p, i) => (
-                <span key={p.id}>
-                  {p.email}
-                  {onlineUsers.has(p.id) && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <span className="ml-1 text-green-500">●</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Online</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  {i < participants.length - 1 ? ', ' : ''}
-                </span>
-              ))}
+    <div className="flex h-full">
+      <div className={`flex-1 flex flex-col p-4 ${activeThread ? 'max-w-[calc(100%-400px)]' : ''}`}>
+        <h1 className="text-2xl font-bold mb-4">
+          {conversation?.type === 'dm' ? (
+            <div className="flex items-center">
+              Chat with {participants[0]?.email}
+              {participants[0] && onlineUsers.has(participants[0].id) && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="ml-2 text-green-500">●</span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Online</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
-          </div>
-        )}
-      </h1>
-      <div className="space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-        {messages.map((message) => (
-          <MessageItem 
-            key={message.id} 
-            message={message} 
-            currentUser={user} 
-            onlineUsers={onlineUsers} 
+          ) : (
+            <div>
+              <div>{conversation?.name || 'Group Chat'}</div>
+              <div className="text-sm font-normal text-gray-500">
+                {participants.map((p, i) => (
+                  <span key={p.id}>
+                    {p.email}
+                    {onlineUsers.has(p.id) && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <span className="ml-1 text-green-500">●</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Online</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    {i < participants.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </h1>
+        <div className="space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+          {messages.map((message) => (
+            <MessageItem 
+              key={message.id} 
+              message={message} 
+              currentUser={user} 
+              onlineUsers={onlineUsers}
+              onThreadOpen={(message) => setActiveThread({
+                messageId: message.id,
+                content: message.content,
+                sender: message.sender
+              })}
+            />
+          ))}
+        </div>
+        <form onSubmit={sendMessage} className="flex gap-2">
+          <input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            className="flex-1 p-2 border rounded"
+            placeholder="Type your message..."
           />
-        ))}
+          <button 
+            type="submit" 
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Send
+          </button>
+        </form>
       </div>
-      <form onSubmit={sendMessage} className="flex gap-2">
-        <input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          className="flex-1 p-2 border rounded"
-          placeholder="Type your message..."
+      {activeThread && (
+        <ConversationThreadComments 
+          messageId={activeThread.messageId}
+          conversationId={params.id}
+          originalMessage={activeThread}
+          onClose={() => setActiveThread(null)}
         />
-        <button 
-          type="submit" 
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Send
-        </button>
-      </form>
+      )}
     </div>
   )
 } 

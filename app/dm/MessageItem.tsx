@@ -4,7 +4,7 @@ import { getSupabase } from '../auth';
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Trash2, X, Check } from 'lucide-react';
+import { Edit2, Trash2, X, Check, MessageSquare } from 'lucide-react';
 
 interface MessageItemProps {
   message: {
@@ -19,14 +19,41 @@ interface MessageItemProps {
     id: string;
   } | null;
   onlineUsers: Set<string>;
+  onThreadOpen: (message: {
+    id: string;
+    content: string;
+    sender: {
+      email: string;
+    };
+  }) => void;
 }
 
-export default function MessageItem({ message, currentUser, onlineUsers }: MessageItemProps) {
+export default function MessageItem({ message, currentUser, onlineUsers, onThreadOpen }: MessageItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
   const { toast } = useToast();
+  const [threadCount, setThreadCount] = useState(0);
+
+  useEffect(() => {
+    fetchThreadCount();
+  }, []);
 
   const canEditOrDelete = currentUser && message.sender.id === currentUser.id;
+
+  const fetchThreadCount = async () => {
+    try {
+      const supabase = getSupabase();
+      const { count, error } = await supabase
+        .from('conversation_thread_comments')
+        .select('id', { count: 'exact' })
+        .eq('message_id', message.id);
+
+      if (error) throw error;
+      setThreadCount(count || 0);
+    } catch (error) {
+      console.error('Error fetching thread count:', error);
+    }
+  };
 
   const handleEdit = async () => {
     if (!currentUser) return;
@@ -154,16 +181,27 @@ export default function MessageItem({ message, currentUser, onlineUsers }: Messa
         </p>
         <p>{message.content}</p>
       </div>
-      {canEditOrDelete && (
-        <div className="hidden group-hover:flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+      <div className="hidden group-hover:flex gap-1">
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={() => onThreadOpen(message)}
+          className="flex items-center gap-1"
+        >
+          <MessageSquare className="h-4 w-4" />
+          {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+        </Button>
+        {canEditOrDelete && (
+          <>
+            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 } 
