@@ -9,6 +9,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import MessageItem from '../../components/MessageItem'
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface Message {
   id: string
@@ -37,6 +39,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [participants, setParticipants] = useState<Participant[]>([])
   const [newMessage, setNewMessage] = useState('')
   const { onlineUsers } = usePresence()
+  const [user, setUser] = useState<{ id: string } | null>(null)
 
   useEffect(() => {
     fetchMessages()
@@ -44,8 +47,9 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
 
     // Set up real-time subscription
     const supabase = getSupabase()
-    const subscription = supabase
-      .channel('messages')
+    const channel = supabase.channel(`messages:${params.id}`)
+
+    channel
       .on(
         'postgres_changes',
         {
@@ -55,17 +59,59 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           filter: `conversation_id=eq.${params.id}`
         },
         (payload) => {
-          // Fetch the complete message with sender information
           fetchMessages()
         }
       )
-      .subscribe()
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${params.id}`
+        },
+        (payload) => {
+          fetchMessages()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${params.id}`
+        },
+        (payload: RealtimePostgresChangesPayload<{
+          id: string;
+          conversation_id: string;
+        }>) => {
+          if (payload.eventType === 'DELETE') {
+            setMessages((prevMessages) => {
+              return prevMessages.filter((msg) => msg.id !== payload.old.id);
+            });
+          }
+        }
+      )
+
+    channel.subscribe()
 
     // Cleanup subscription on unmount
     return () => {
-      subscription.unsubscribe()
+      channel.unsubscribe()
     }
   }, [params.id])
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUser({ id: user.id })
+      }
+    }
+    fetchUser()
+  }, [])
 
   const fetchConversationAndParticipants = async () => {
     const supabase = getSupabase()
@@ -210,24 +256,12 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
       </h1>
       <div className="space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto">
         {messages.map((message) => (
-          <div key={message.id} className="p-2 rounded bg-gray-100">
-            <p className="font-bold flex items-center">
-              {message.sender.email}
-              {onlineUsers.has(message.sender.id) && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <span className="ml-2 text-green-500">●</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Online</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </p>
-            <p>{message.content}</p>
-          </div>
+          <MessageItem 
+            key={message.id} 
+            message={message} 
+            currentUser={user} 
+            onlineUsers={onlineUsers} 
+          />
         ))}
       </div>
       <form onSubmit={sendMessage} className="flex gap-2">

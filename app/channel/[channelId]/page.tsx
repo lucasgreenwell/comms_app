@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LogOut } from 'lucide-react'
 import PostItem from './PostItem'
+import ThreadComments from './ThreadComments'
 
 interface Post {
   id: string
@@ -34,6 +35,13 @@ export default function Channel() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [channel, setChannel] = useState<Channel | null>(null)
   const router = useRouter()
+  const [activeThread, setActiveThread] = useState<{
+    postId: string;
+    content: string;
+    user: {
+      email: string;
+    };
+  } | null>(null);
 
   useEffect(() => {
     fetchChannel()
@@ -68,7 +76,6 @@ export default function Channel() {
     const channel = supabase
       .channel(`public:posts:channel_id=eq.${channelId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'posts', filter: `channel_id=eq.${channelId}` }, (payload) => {
-        console.log('Change received!', payload)
         if (payload.eventType === 'INSERT') {
           fetchPosts() // Refetch all posts to ensure we have the latest data with user info
         }
@@ -156,41 +163,59 @@ export default function Channel() {
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
-    <div className="flex flex-col h-full p-4 max-w-[1200px] mx-auto w-full">
-      <div className="flex justify-between items-center mb-4 w-full min-w-0">
-        <h1 className="text-2xl font-bold truncate">
-          # {channel?.name || 'Loading...'}
-        </h1>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={handleLeaveChannel}
-          className="text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0 ml-4"
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Leave Channel
-        </Button>
-      </div>
-      <div className="flex-1 overflow-y-auto mb-4 w-full min-w-0">
-        <div className="flex flex-col w-full min-w-0">
-          {posts.map((post) => (
-            <PostItem key={post.id} post={post} onPostUpdate={fetchPosts} />
-          ))}
-          <div ref={messagesEndRef} />
+    <div className="flex h-full">
+      <div className={`flex-1 flex flex-col h-full p-4 ${activeThread ? 'max-w-[calc(100%-400px)]' : 'max-w-[1200px]'} mx-auto w-full`}>
+        <div className="flex justify-between items-center mb-4 w-full min-w-0">
+          <h1 className="text-2xl font-bold truncate">
+            # {channel?.name || 'Loading...'}
+          </h1>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={handleLeaveChannel}
+            className="text-red-500 hover:text-red-700 hover:bg-red-100 shrink-0 ml-4"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Leave Channel
+          </Button>
         </div>
-      </div>
-      <form onSubmit={handleSendMessage} className="flex gap-4 w-full min-w-0">
-        <div className="flex-1 min-w-0">
-          <Input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type your message..."
-            className="w-full"
-          />
+        <div className="flex-1 overflow-y-auto mb-4 w-full min-w-0">
+          <div className="flex flex-col w-full min-w-0">
+            {posts.map((post) => (
+              <PostItem 
+                key={post.id} 
+                post={post} 
+                onPostUpdate={fetchPosts}
+                onThreadOpen={(post) => setActiveThread({
+                  postId: post.id,
+                  content: post.content,
+                  user: post.user
+                })}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
-        <Button type="submit" className="shrink-0">Send</Button>
-      </form>
+        <form onSubmit={handleSendMessage} className="flex gap-4 w-full min-w-0">
+          <div className="flex-1 min-w-0">
+            <Input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="w-full"
+            />
+          </div>
+          <Button type="submit" className="shrink-0">Send</Button>
+        </form>
+      </div>
+      {activeThread && (
+        <ThreadComments 
+          postId={activeThread.postId} 
+          originalPost={activeThread}
+          onClose={() => setActiveThread(null)} 
+        />
+      )}
     </div>
   )
 }

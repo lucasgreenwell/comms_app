@@ -1,31 +1,51 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Edit2, Trash2, X, Check } from 'lucide-react'
+import { Edit2, Trash2, X, Check, MessageSquare } from 'lucide-react'
 import { getCurrentUser, getSupabase } from '../../auth'
 
-interface PostItemProps {
-  post: {
+interface Post {
+  id: string
+  user_id: string
+  content: string
+  user: {
     id: string
-    user_id: string
-    content: string
-    user: {
-      id: string
-      email: string
-    }
+    email: string
   }
-  onPostUpdate: () => void
 }
 
-export default function PostItem({ post, onPostUpdate }: PostItemProps) {
+interface PostItemProps {
+  post: Post
+  onPostUpdate: () => void
+  onThreadOpen: (post: Post) => void
+}
+
+export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState(post.content)
   const [currentUser, setCurrentUser] = useState<any>(null)
+  const [threadCount, setThreadCount] = useState(0)
 
   useEffect(() => {
     getCurrentUser().then(user => setCurrentUser(user))
+    fetchThreadCount()
   }, [])
 
   const isOwner = currentUser?.id === post.user_id
+
+  const fetchThreadCount = async () => {
+    try {
+      const supabase = getSupabase()
+      const { count, error } = await supabase
+        .from('post_thread_comments')
+        .select('id', { count: 'exact' })
+        .eq('post_id', post.id)
+
+      if (error) throw error
+      setThreadCount(count || 0)
+    } catch (error) {
+      console.error('Error fetching thread count:', error)
+    }
+  }
 
   const handleEdit = async () => {
     try {
@@ -45,8 +65,6 @@ export default function PostItem({ post, onPostUpdate }: PostItemProps) {
   }
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this message?')) return
-
     try {
       const supabase = getSupabase()
       const { error } = await supabase
@@ -89,18 +107,31 @@ export default function PostItem({ post, onPostUpdate }: PostItemProps) {
   }
 
   return (
-    <div className="flex gap-2 items-center mb-2 group">
-      <strong>{post.user.email}:</strong> {post.content}
-      {isOwner && (
-        <div className="hidden group-hover:flex gap-2 ml-2">
-          <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+    <div className="flex gap-2 items-start mb-2 group">
+      <div className="flex-1">
+        <strong>{post.user.email}:</strong> {post.content}
+      </div>
+      <div className="flex items-center gap-2">
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={() => onThreadOpen(post)}
+          className="hidden group-hover:flex items-center gap-1"
+        >
+          <MessageSquare className="h-4 w-4" />
+          {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+        </Button>
+        {isOwner && (
+          <div className="hidden group-hover:flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
+              <Edit2 className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="ghost" className="text-red-500" onClick={handleDelete}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 } 
