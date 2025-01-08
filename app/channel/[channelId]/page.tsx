@@ -19,6 +19,7 @@ interface Post {
   user: {
     id: string
     email: string
+    display_name?: string | null
   }
 }
 
@@ -107,7 +108,34 @@ export default function Channel() {
       }, 
       (payload) => {
         if (payload.eventType === 'INSERT') {
-          fetchPosts() // Refetch all posts to ensure we have the latest data with user info
+          const fetchUserDetails = async (userId: string) => {
+            const { data: user, error } = await getSupabase()
+              .from('users')
+              .select('id, email, display_name')
+              .eq('id', userId)
+              .single();
+            if (error) {
+              console.error('Error fetching user details:', error);
+              return { id: 'unknown', email: 'unknown', display_name: 'unknown' };
+            }
+            return user;
+          };
+
+          fetchUserDetails(payload.new.user_id).then(user => {
+            const newPost: Post = {
+              id: payload.new.id,
+              user_id: payload.new.user_id,
+              channel_id: payload.new.channel_id,
+              content: payload.new.content,
+              created_at: payload.new.created_at,
+              user: {
+                id: user.id,
+                email: user.email,
+                display_name: user.display_name || user.email
+              }
+            };
+            setPosts(prevPosts => [...prevPosts, newPost]);
+          });
         } else if (payload.eventType === 'UPDATE') {
           setPosts(prevPosts => 
             prevPosts.map(post => 
