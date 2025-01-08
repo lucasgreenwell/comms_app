@@ -427,29 +427,29 @@ export default function Sidebar() {
                 className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
               >
                 <div className="flex items-center">
-                  {dm.type === 'dm' ? (
-                    <>
-                      <span className="text-sm">{dm.participants[0]?.email}</span>
-                      {onlineUsers.has(dm.participants[0]?.id) && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <span className="ml-2 text-green-500">●</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Online</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      )}
-                    </>
-                  ) : (
+                  {dm.type === 'group' ? (
                     <div>
                       <span className="text-sm font-medium">{dm.name || 'Group Chat With'}</span>
                       <div className="text-xs">
                         {dm.participants.map(p => p.email).join(', ')}
                       </div>
                     </div>
+                  ) : (
+                    <>
+                      <span className="text-sm">{dm.participants[0]?.email}</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <span className={`ml-2 ${onlineUsers.has(dm.participants[0]?.id) ? 'text-green-500' : 'text-gray-400'}`}>
+                              {onlineUsers.has(dm.participants[0]?.id) ? '●' : '○'}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{onlineUsers.has(dm.participants[0]?.id) ? 'Online' : 'Offline'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
                   )}
                 </div>
               </Link>
