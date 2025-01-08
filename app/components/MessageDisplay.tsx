@@ -17,7 +17,7 @@ interface File {
 
 interface User {
   id: string;
-  email: string;
+  email?: string;
   display_name?: string | null;
 }
 
