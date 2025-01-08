@@ -31,7 +31,7 @@ interface MessageDisplayProps {
   messageType: 'post' | 'post_thread' | 'dm' | 'dm_thread';
   threadCount?: number;
   onThreadOpen?: (message: any) => void;
-  onUpdate: () => void;
+  onUpdate: (content: string) => void;
   tableName: string;
   className?: string;
 }
@@ -92,7 +92,7 @@ export default function MessageDisplay({
     }
 
     setIsEditing(false);
-    onUpdate();
+    onUpdate(editedContent);
     toast({
       title: "Message updated",
       description: "Your message has been successfully updated."
@@ -117,7 +117,7 @@ export default function MessageDisplay({
       return;
     }
 
-    onUpdate();
+    onUpdate(content);
     toast({
       title: "Message deleted",
       description: "Your message has been successfully deleted."
@@ -204,7 +204,7 @@ export default function MessageDisplay({
         description: "The file has been successfully deleted."
       });
       
-      onUpdate();
+      onUpdate(content);
     } catch (error) {
       console.error('Error deleting file:', error);
       toast({

@@ -10,15 +10,10 @@ export interface UserPresence {
 }
 
 type DatabasePresencePayload = {
-  type: 'INSERT' | 'UPDATE' | 'DELETE'
-  table: string
-  schema: string
-  commit_timestamp: string
-  eventType: 'INSERT' | 'UPDATE' | 'DELETE'
-  new: UserPresence
-  old: UserPresence | null
-  errors: null
-}
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: Partial<UserPresence>;
+  old: Partial<UserPresence> | null;
+};
 
 export function usePresence() {
   const { user } = useUser()
@@ -54,23 +49,23 @@ export function usePresence() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            if (payload.new && payload.new.is_online) {
+            if (payload.new.is_online) {
               setOnlineUsers(prev => {
-                const newSet = new Set(prev)
-                newSet.add(payload.new.user_id)
-                return newSet
-              })
+                const newSet = new Set(prev);
+                newSet.add(payload.new.user_id!);
+                return newSet;
+              });
             }
           } else if (payload.eventType === 'DELETE' || 
-            (payload.eventType === 'UPDATE' && payload.new && !payload.new.is_online)) {
+            (payload.eventType === 'UPDATE' && !payload.new.is_online)) {
             setOnlineUsers(prev => {
-              const newSet = new Set(prev)
-              const userId = payload.old?.user_id || (payload.new && payload.new.user_id)
+              const newSet = new Set(prev);
+              const userId = payload.old?.user_id || payload.new.user_id;
               if (userId) {
-                newSet.delete(userId)
+                newSet.delete(userId);
               }
-              return newSet
-            })
+              return newSet;
+            });
           }
         }
       )

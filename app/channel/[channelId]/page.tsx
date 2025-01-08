@@ -364,6 +364,50 @@ export default function Channel() {
     setActiveThread(null)
   }
 
+  const handleEditPost = async (postId: string, newContent: string) => {
+    try {
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: newContent }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to edit post');
+      }
+
+      const updatedPost = await response.json();
+
+      setPosts(prevPosts =>
+        prevPosts.map(post =>
+          post.id === postId ? { ...post, content: updatedPost.content } : post
+        )
+      );
+    } catch (error) {
+      console.error('Error editing post:', error);
+      setError('Failed to edit post');
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      const response = await fetch(`/api/posts/${postId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete post');
+      }
+
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      setError('Failed to delete post');
+    }
+  };
+
   if (loading) return <div>Loading posts...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
@@ -390,7 +434,13 @@ export default function Channel() {
               <PostItem 
                 key={post.id} 
                 post={post} 
-                onPostUpdate={fetchPosts}
+                onPostUpdate={(updatedPost: Post) => {
+                  setPosts(prevPosts =>
+                    prevPosts.map(post =>
+                      post.id === updatedPost.id ? { ...post, content: updatedPost.content } : post
+                    )
+                  );
+                }}
                 onThreadOpen={handleThreadOpen}
               />
             ))}

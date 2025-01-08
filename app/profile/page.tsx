@@ -10,11 +10,17 @@ import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import { Input } from '@/components/ui/input'
 import { toast } from 'react-hot-toast'
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
+import { User } from '@supabase/supabase-js'
 
 const THEME_STORAGE_KEY = 'slack-clone-theme'
 
+interface ExtendedUser extends User {
+  display_name?: string | null;
+}
+
 export default function ProfilePage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<ExtendedUser | null>(null)
   const [selectedTheme, setSelectedTheme] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(THEME_STORAGE_KEY) || 'slate'
@@ -22,6 +28,8 @@ export default function ProfilePage() {
     return 'slate'
   })
   const [displayName, setDisplayName] = useState<string>('')
+  const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -36,6 +44,68 @@ export default function ProfilePage() {
     const currentUser = await getCurrentUser()
     setUser(currentUser)
     setDisplayName(currentUser?.display_name || '')
+    
+    if (currentUser) {
+      const supabase = getSupabase()
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('profile_pic_url')
+        .eq('id', currentUser.id)
+        .single()
+      
+      setProfilePicUrl(data?.profile_pic_url || null)
+    }
+  }
+
+  const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user) return;
+    try {
+      if (!e.target.files || !e.target.files[0]) return;
+
+      const file = e.target.files[0]
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload an image file')
+        return
+      }
+
+      setUploading(true)
+      const supabase = getSupabase()
+      
+      // Upload the file
+      const fileExt = file.name.split('.').pop()
+      const filePath = `${user.id}/${Date.now()}.${fileExt}`
+      
+      const { error: uploadError } = await supabase.storage
+        .from('profile-pics')
+        .upload(filePath, file, { upsert: true })
+
+      if (uploadError) throw uploadError
+
+      // Get the public URL using the newer method
+      const {
+        data: { publicUrl },
+      } = supabase.storage
+        .from('profile-pics')
+        .getPublicUrl(filePath)
+
+      // Update the profile with the public URL
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: user.id,
+          profile_pic_url: publicUrl
+        })
+
+      if (updateError) throw updateError
+
+      setProfilePicUrl(publicUrl)
+      toast.success('Profile picture updated successfully!')
+    } catch (error) {
+      console.error('Error uploading profile picture:', error)
+      toast.error('Failed to update profile picture')
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleLogout = async () => {
@@ -72,11 +142,38 @@ export default function ProfilePage() {
 
   if (!user) return <div>Loading...</div>
 
+  const initials = ((user.display_name || user.email) || '')
+    .split(' ')
+    .map((n: string) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+
   return (
     <div className="p-8 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-6">Profile Settings</h1>
       
       <Card className="p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Profile Picture</h2>
+        <div className="flex items-center gap-4 mb-4">
+          <Avatar className="h-20 w-20">
+            <AvatarImage src={profilePicUrl || undefined} alt={displayName} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+          <div>
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={handleProfilePicUpload}
+              disabled={uploading}
+              className="mb-2"
+            />
+            <p className="text-sm text-gray-500">
+              Recommended: Square image, at least 400x400 pixels
+            </p>
+          </div>
+        </div>
+
         <h2 className="text-lg font-semibold mb-2">User Information</h2>
         <form onSubmit={handleDisplayNameChange}>
           <div className="mb-4">

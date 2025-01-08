@@ -23,7 +23,7 @@ interface Post {
 
 interface PostItemProps {
   post: Post
-  onPostUpdate: () => void
+  onPostUpdate: (updatedPost: Post) => void
   onThreadOpen: (post: {
     id: string
     content: string
@@ -60,6 +60,11 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
     }
   }
 
+  const handleUpdate = (updatedContent: string) => {
+    const updatedPost = { ...post, content: updatedContent };
+    onPostUpdate(updatedPost);
+  };
+
   return (
     <MessageDisplay
       id={post.id}
@@ -75,7 +80,7 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
         content: post.content,
         user: post.user
       })}
-      onUpdate={onPostUpdate}
+      onUpdate={handleUpdate}
       tableName="posts"
       className="mb-4"
     />
