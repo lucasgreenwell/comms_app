@@ -34,6 +34,7 @@ interface MessageDisplayProps {
   onUpdate: (content: string) => void;
   tableName: string;
   className?: string;
+  hideActions?: boolean;
 }
 
 export default function MessageDisplay({
@@ -48,7 +49,8 @@ export default function MessageDisplay({
   onThreadOpen,
   onUpdate,
   tableName,
-  className = ''
+  className = '',
+  hideActions
 }: MessageDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
@@ -308,7 +310,7 @@ export default function MessageDisplay({
           )}
         </div>
         <div className="flex gap-1">
-          {showThread && onThreadOpen && (
+          {showThread && onThreadOpen && !hideActions && (
             <Button 
               size="sm" 
               variant="ghost" 
@@ -319,7 +321,7 @@ export default function MessageDisplay({
               {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
             </Button>
           )}
-          {isOwner && (
+          {isOwner && !hideActions && (
             <>
               <Button 
                 size="sm" 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
-import { X } from 'lucide-react'
+import { X, MessageSquare } from 'lucide-react'
 import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -9,13 +9,24 @@ import MessageDisplay from './MessageDisplay'
 interface Post {
   id: string
   content: string
-  channel_id: string
+  channel_id?: string
+  post_id?: string
   user_id: string
   user: {
     id: string
     display_name: string
     email?: string
   }
+}
+
+interface ThreadComment {
+  id: string;
+  content: string;
+  post_id: string;
+  user_id: string;
+  posts: {
+    channel_id: string;
+  };
 }
 
 interface SearchModalProps {
@@ -45,14 +56,33 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No user found')
 
-      const { data: posts, error } = await supabase
+      const { data: posts, error: postError } = await supabase
         .from('posts')
         .select('id, content, channel_id, user_id')
         .ilike('content', `%${searchQuery}%`)
 
-      if (error) throw error
+      if (postError) throw postError
 
-      const userIds = posts.map(post => post.user_id)
+      const { data: threadComments, error: threadError } = await supabase
+        .from('post_thread_comments')
+        .select(`
+          id,
+          content,
+          post_id,
+          user_id,
+          posts!inner (
+            channel_id
+          )
+        `)
+        .ilike('content', `%${searchQuery}%`) as { data: ThreadComment[] | null, error: any };
+
+      if (threadError) throw threadError
+
+      const userIds = [
+        ...posts.map(post => post.user_id), 
+        ...(threadComments?.map(comment => comment.user_id) || [])
+      ];
+
       const { data: users, error: userError } = await supabase
         .from('users')
         .select('id, display_name')
@@ -65,7 +95,13 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
         user: users.find(u => u.id === post.user_id) || { id: '', display_name: '' }
       }))
 
-      setSearchResults(postsWithUser || [])
+      const threadCommentsWithUser = (threadComments || []).map(comment => ({
+        ...comment,
+        channel_id: comment.posts.channel_id,
+        user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
+      }))
+
+      setSearchResults([...postsWithUser, ...threadCommentsWithUser])
     } catch (error) {
       console.error('Error searching posts:', error)
     } finally {
@@ -84,6 +120,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     onClose();
     setSearchQuery('');
     setSearchResults([]);
+    setHasSearched(false);
   };
 
   useEffect(() => {
@@ -103,12 +140,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     };
   }, [isOpen]);
 
-  const handleResultClick = (post: Post) => {
-    onClose()
-    setSearchQuery('')
-    setSearchResults([])
-    router.push(`/channel/${post.channel_id}?thread=${post.id}`)
-  }
+  const handleResultClick = (item: Post) => {
+    handleClose();
+    const threadId = item.post_id || item.id;
+    router.push(`/channel/${item.channel_id}?thread=${threadId}`);
+  };
 
   if (!isOpen) return null
 
@@ -146,22 +182,24 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
         {searchResults.length === 0 && !isLoading && hasSearched && (
           <div className="text-center text-gray-500">No results found</div>
         )}
-        {searchResults.map(post => (
+        {searchResults.map(item => (
           <div
-            key={post.id}
-            onClick={() => handleResultClick(post)}
-            className="cursor-pointer"
+            key={item.id}
+            onClick={() => handleResultClick(item)}
+            className="cursor-pointer flex justify-between items-center"
           >
             <MessageDisplay
-              id={post.id}
-              content={post.content}
-              user={post.user}
+              id={item.id}
+              content={item.content}
+              user={item.user}
               currentUser={null}
               messageType="post"
               onUpdate={() => {}}
               tableName="posts"
-              onThreadOpen={() => handleResultClick(post)}
+              onThreadOpen={() => handleResultClick(item)}
+              hideActions={true}
             />
+            {item.post_id && <MessageSquare className="h-4 w-4 text-gray-500" />}
           </div>
         ))}
       </div>
