@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Trash2, X, Check, MessageSquare, Download, FileIcon } from 'lucide-react';
+import { Edit2, Trash2, X, Check, Waves, Download, FileIcon } from 'lucide-react';
 import { getCurrentUser, getSupabase } from '../auth';
 import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
@@ -317,7 +317,7 @@ export default function MessageDisplay({
               onClick={() => onThreadOpen({ id, content, user })}
               className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
             >
-              <MessageSquare className="h-4 w-4" />
+              <Waves className="h-4 w-4" />
               {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
             </Button>
           )}

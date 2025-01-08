@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
-import { X, MessageSquare } from 'lucide-react'
+import { X, Waves } from 'lucide-react'
 import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -199,7 +199,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               onThreadOpen={() => handleResultClick(item)}
               hideActions={true}
             />
-            {item.post_id && <MessageSquare className="h-4 w-4 text-gray-500" />}
+            {item.post_id && <Waves className="h-4 w-4 text-gray-500" />}
           </div>
         ))}
       </div>
