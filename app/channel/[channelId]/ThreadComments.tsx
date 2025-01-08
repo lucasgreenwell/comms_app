@@ -7,6 +7,8 @@ import { X, Paperclip } from 'lucide-react'
 import ThreadCommentItem from './ThreadCommentItem'
 import { useToast } from "@/components/ui/use-toast"
 import { themes } from '../../config/themes'
+import { usePresence } from '../../hooks/usePresence'
+import MessageDisplay from '../../components/MessageDisplay'
 
 interface ThreadComment {
   id: string
@@ -32,8 +34,10 @@ interface ThreadCommentsProps {
   postId: string
   onClose: () => void
   originalPost: {
+    id: string
     content: string
     user: {
+      id: string
       email: string
       display_name?: string | null
     }
@@ -48,12 +52,18 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const { onlineUsers } = usePresence()
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
     }
     return themes[0]
   })
+
+  useEffect(() => {
+    getCurrentUser().then(user => setCurrentUser(user))
+  }, [])
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -279,9 +289,17 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
         </Button>
       </div>
 
-      <div className={`${theme.colors.background} p-4 border-b ${theme.colors.foreground}`}>
-        <div className={`font-bold ${theme.colors.foreground}`}>{originalPost.user.display_name || originalPost.user.email}</div>
-        <div>{originalPost.content}</div>
+      <div className="border-b">
+        <MessageDisplay
+          id={originalPost.id}
+          content={originalPost.content}
+          user={originalPost.user}
+          currentUser={currentUser}
+          onlineUsers={onlineUsers}
+          messageType="post"
+          onUpdate={() => {}}
+          tableName="posts"
+        />
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

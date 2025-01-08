@@ -5,6 +5,9 @@ import { getSupabase } from '../auth'
 import { X } from 'lucide-react'
 import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
+import { toast } from '@/components/ui/use-toast'
+import UserDisplay from './UserDisplay'
+import { usePresence } from '../hooks/usePresence'
 
 interface User {
   id: string
@@ -22,6 +25,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { onlineUsers } = usePresence()
   const [theme] = useState(() => {
     if (typeof window !== 'undefined') {
       return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
@@ -74,7 +78,31 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
     const supabase = getSupabase()
     const { data: { user: currentUser } } = await supabase.auth.getUser()
 
+    if (!currentUser) {
+      setIsLoading(false)
+      return
+    }
+
     try {
+      // Sort and deduplicate participant IDs to ensure consistency
+      const allParticipantIds = Array.from(new Set([...selectedUsers.map(u => u.id), currentUser.id])).sort()
+      
+      // First, check if a conversation with these exact participants exists
+      const { data: existingConversation, error: lookupError } = await supabase
+        .rpc('find_existing_conversation', {
+          participant_ids: allParticipantIds
+        })
+
+      if (lookupError) throw lookupError
+
+      if (existingConversation) {
+        onClose()
+        setSelectedUsers([])
+        router.push(`/dm/${existingConversation}`)
+        return
+      }
+
+      // If no existing conversation, create a new one within a transaction
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert({
@@ -86,13 +114,11 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
       if (convError) throw convError
 
-      const participants = [
-        { conversation_id: conversation.id, user_id: currentUser?.id },
-        ...selectedUsers.map(user => ({
-          conversation_id: conversation.id,
-          user_id: user.id
-        }))
-      ]
+      // Create participant entries
+      const participants = allParticipantIds.map(userId => ({
+        conversation_id: conversation.id,
+        user_id: userId
+      }))
 
       const { error: partError } = await supabase
         .from('conversation_participants')
@@ -100,11 +126,24 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
       if (partError) throw partError
 
+      // Double-check that we didn't create a duplicate during the process
+      const { data: finalCheck } = await supabase
+        .rpc('find_existing_conversation', {
+          participant_ids: allParticipantIds
+        })
+
+      const finalConversationId = finalCheck || conversation.id
+
       onClose()
       setSelectedUsers([])
-      router.push(`/dm/${conversation.id}`)
+      router.push(`/dm/${finalConversationId}`)
     } catch (error) {
       console.error('Error creating conversation:', error)
+      toast({
+        variant: "destructive",
+        title: "Error creating conversation",
+        description: "There was an error creating the conversation. Please try again."
+      })
     } finally {
       setIsLoading(false)
     }
@@ -132,7 +171,10 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
               key={user.id} 
               className="bg-indigo-100 rounded-full px-3 py-1 text-sm flex items-center text-indigo-700"
             >
-              <span>{user.display_name || user.email}</span>
+              <UserDisplay 
+                user={user}
+                isOnline={onlineUsers.has(user.id)}
+              />
               <button
                 onClick={() => setSelectedUsers(users => users.filter(u => u.id !== user.id))}
                 className="ml-2 hover:bg-indigo-50 p-1 rounded-full"
@@ -161,7 +203,10 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
                 }
               }}
             >
-              {user.display_name || user.email}
+              <UserDisplay 
+                user={user}
+                isOnline={onlineUsers.has(user.id)}
+              />
             </div>
           ))}
         </div>

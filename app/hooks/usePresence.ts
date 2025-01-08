@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
 import { RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js'
+import { useUser } from './useUser'
 
 export interface UserPresence {
   user_id: string
@@ -20,16 +21,15 @@ type DatabasePresencePayload = {
 }
 
 export function usePresence() {
+  const { user } = useUser()
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const supabase = getSupabase()
+    if (!user) return
     
-    // Update own presence
-    const updatePresence = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+    const supabase = getSupabase()
 
+    const updatePresence = async () => {
       await supabase
         .from('presence')
         .upsert({
@@ -90,9 +90,6 @@ export function usePresence() {
 
     // Set up cleanup for when user leaves
     const handleBeforeUnload = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       await supabase
         .from('presence')
         .update({
@@ -117,7 +114,7 @@ export function usePresence() {
       clearInterval(presenceInterval)
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user])
 
   return { onlineUsers }
 } 

@@ -25,6 +25,7 @@ import {
 import StartChatModal from './StartChatModal'
 import { usePresence } from '../hooks/usePresence'
 import SearchModal from './SearchModal'
+import UserDisplay from './UserDisplay'
 
 interface Channel {
   id: string
@@ -51,7 +52,8 @@ interface Post {
 
 export default function Sidebar() {
   const [channels, setChannels] = useState<Channel[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingChannels, setLoadingChannels] = useState(true)
+  const [loadingDMs, setLoadingDMs] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newChannelName, setNewChannelName] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -141,7 +143,7 @@ export default function Sidebar() {
 
 
   const fetchChannels = async () => {
-    setLoading(true)
+    setLoadingChannels(true)
     setError(null)
     try {
       const supabase = getSupabase()
@@ -177,7 +179,7 @@ export default function Sidebar() {
       setError('Failed to fetch channels')
       console.error('Error fetching channels:', error)
     } finally {
-      setLoading(false)
+      setLoadingChannels(false)
     }
   }
 
@@ -245,64 +247,47 @@ export default function Sidebar() {
   }
 
   const fetchDirectMessages = async () => {
+    setLoadingDMs(true)
     try {
       const supabase = getSupabase()
       const { data: { user } } = await supabase.auth.getUser()
       
       if (!user) throw new Error('No user found')
 
-      // First get all conversations the user is part of
-      const { data: userConversations, error: conversationsError } = await supabase
-        .from('conversation_participants')
-        .select(`
-          conversation_id,
-          conversation:conversations (
-            type,
-            name
-          )
-        `)
-        .eq('user_id', user.id)
+      // Use the Supabase function to fetch conversations and participants
+      const { data: conversations, error } = await supabase
+        .rpc('fetch_user_conversations', { user_id: user.id })
 
-      if (conversationsError) throw conversationsError
+      if (error) throw error
 
-      // Then get all participants for these conversations
-      const conversationIds = userConversations?.map(conv => conv.conversation_id) || []
-      const { data: participants, error: participantsError } = await supabase
-        .from('conversation_participants')
-        .select(`
-          conversation_id,
-          users!conversation_participants_user_id_fkey (
-            id,
-            email,
-            display_name
-          )
-        `)
-        .neq('user_id', user.id)
-        .in('conversation_id', conversationIds)
-
-      if (participantsError) throw participantsError
-
-      // Group participants by conversation
-      const participantsByConversation = participants?.reduce((acc, p) => {
-        const participant = Array.isArray(p.users) ? p.users[0] : p.users
-        if (!acc[p.conversation_id]) {
-          acc[p.conversation_id] = []
+      // Process the data to group participants by conversation
+      const participantsByConversation = conversations.reduce((acc: Record<string, { id: string; email: string; display_name?: string }[]>, conv: any) => {
+        if (!acc[conv.conversation_id]) {
+          acc[conv.conversation_id] = []
         }
-        acc[p.conversation_id].push(participant)
+        acc[conv.conversation_id].push({
+          id: conv.participant_id,
+          email: conv.participant_email,
+          display_name: conv.participant_display_name
+        })
         return acc
-      }, {} as Record<string, { id: string; email: string; display_name?: string }[]>)
+      }, {});
 
       // Combine conversation info with participants
-      const processedDMs = userConversations?.map(conv => ({
-        conversation_id: conv.conversation_id,
-        type: conv.conversation?.[0]?.type,
-        name: conv.conversation?.[0]?.name,
-        participants: participantsByConversation[conv.conversation_id] || []
-      })) || []
+      const processedDMs = Object.keys(participantsByConversation).map((conversation_id: string) => ({
+        conversation_id,
+        type: conversations.find((conv: any) => conv.conversation_id === conversation_id)?.type,
+        name: conversations.find((conv: any) => conv.conversation_id === conversation_id)?.name,
+        participants: participantsByConversation[conversation_id].map((participant: { id: string; email: string; display_name?: string }) => ({
+          ...participant
+        }))
+      }));
 
       setDirectMessages(processedDMs as DirectMessage[])
     } catch (error) {
       console.error('Error fetching DMs:', error)
+    } finally {
+      setLoadingDMs(false)
     }
   }
 
@@ -327,7 +312,6 @@ export default function Sidebar() {
     }
   }
 
-  if (loading) return <div>Loading...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
@@ -340,16 +324,20 @@ export default function Sidebar() {
       </div>
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <ul className="mb-2 overflow-y-auto max-h-[150px]">
-        {channels.map((channel) => (
-          <li key={channel.id} className="mb-2">
-            <Link 
-              href={`/channel/${channel.id}`} 
-              className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
-            >
-              <span className="text-sm"># {channel.name}</span>
-            </Link>
-          </li>
-        ))}
+        {loadingChannels ? (
+          <div className="p-2 text-sm text-gray-500">Loading channels...</div>
+        ) : (
+          channels.map((channel) => (
+            <li key={channel.id} className="mb-2">
+              <Link 
+                href={`/channel/${channel.id}`} 
+                className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
+              >
+                <span className="text-sm"># {channel.name}</span>
+              </Link>
+            </li>
+          ))
+        )}
       </ul>
 
       <div className="space-y-1 border-t pt-2">
@@ -422,41 +410,34 @@ export default function Sidebar() {
           </button>
         </div>
         <ul className="mb-2 overflow-y-auto flex-1">
-          {directMessages.map((dm) => (
-            <li key={dm.conversation_id} className="mb-2">
-              <Link 
-                href={`/dm/${dm.conversation_id}`} 
-                className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
-              >
-                <div className="flex items-center">
-                  {dm.type === 'group' ? (
-                    <div>
-                      <span className="text-sm font-medium">{dm.name || 'Group Chat With'}</span>
-                      <div className="text-xs">
-                        {dm.participants.map(p => p.display_name || p.email).join(', ')}
+          {loadingDMs ? (
+            <div className="p-2 text-sm text-gray-500">Loading messages...</div>
+          ) : (
+            directMessages.map((dm) => (
+              <li key={dm.conversation_id} className="mb-2">
+                <Link 
+                  href={`/dm/${dm.conversation_id}`} 
+                  className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
+                >
+                  <div className="flex items-center">
+                    {dm.type === 'group' ? (
+                      <div>
+                        <span className="text-sm font-medium">{dm.name || 'Group Chat With'}</span>
+                        <div className="text-xs">
+                          {dm.participants.map(p => p.display_name || p.email).join(', ')}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                      <span className="text-sm">{dm.participants[0]?.display_name || dm.participants[0]?.email}</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <span className={`ml-2 ${onlineUsers.has(dm.participants[0]?.id) ? 'text-green-500' : 'text-gray-400'}`}>
-                              {onlineUsers.has(dm.participants[0]?.id) ? '●' : '○'}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{onlineUsers.has(dm.participants[0]?.id) ? 'Online' : 'Offline'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </>
-                  )}
-                </div>
-              </Link>
-            </li>
-          ))}
+                    ) : (
+                      <UserDisplay 
+                        user={dm.participants[0]}
+                        isOnline={onlineUsers.has(dm.participants[0]?.id)}
+                      />
+                    )}
+                  </div>
+                </Link>
+              </li>
+            ))
+          )}
         </ul>
       </div>
 

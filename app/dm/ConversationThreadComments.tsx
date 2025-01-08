@@ -7,6 +7,8 @@ import { X, Paperclip } from 'lucide-react'
 import ConversationThreadCommentItem from '../dm/ConversationThreadCommentItem'
 import { useToast } from '@/components/ui/use-toast'
 import { themes } from '../config/themes'
+import { usePresence } from '../hooks/usePresence'
+import MessageDisplay from '../components/MessageDisplay'
 
 interface ThreadComment {
   id: string
@@ -34,8 +36,10 @@ interface ConversationThreadCommentsProps {
   conversationId: string
   onClose: () => void
   originalMessage: {
+    id: string
     content: string
     sender: {
+      id: string
       email: string
       display_name?: string | null
     }
@@ -50,12 +54,18 @@ export default function ConversationThreadComments({ messageId, conversationId, 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+  const { onlineUsers } = usePresence()
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
     }
     return themes[0]
   })
+
+  useEffect(() => {
+    getCurrentUser().then(user => setCurrentUser(user))
+  }, [])
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -280,9 +290,17 @@ export default function ConversationThreadComments({ messageId, conversationId, 
         </Button>
       </div>
 
-      <div className={`${theme.colors.background} p-4 border-b ${theme.colors.foreground}`}>
-        <div className={`font-bold ${theme.colors.foreground}`}>{originalMessage.sender.display_name || originalMessage.sender.email}</div>
-        <div>{originalMessage.content}</div>
+      <div className="border-b">
+        <MessageDisplay
+          id={originalMessage.id}
+          content={originalMessage.content}
+          user={originalMessage.sender}
+          currentUser={currentUser}
+          onlineUsers={onlineUsers}
+          messageType="dm_thread"
+          onUpdate={() => {}}
+          tableName="messages"
+        />
       </div>
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

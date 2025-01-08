@@ -42,7 +42,9 @@ export default function Channel() {
     postId: string;
     content: string;
     user: {
+      id: string;
       email: string;
+      display_name?: string | null;
     };
   } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -444,7 +446,11 @@ export default function Channel() {
       {activeThread && (
         <ThreadComments 
           postId={activeThread.postId} 
-          originalPost={activeThread}
+          originalPost={{
+            id: activeThread.postId,
+            content: activeThread.content,
+            user: activeThread.user
+          }}
           onClose={handleThreadClose} 
         />
       )}

@@ -16,6 +16,7 @@ import { Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from "@/components/ui/use-toast"
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import UserDisplay from '../../components/UserDisplay'
 
 interface Message {
   id: string
@@ -47,6 +48,12 @@ interface Participant {
   display_name?: string | null
 }
 
+interface User {
+  id: string
+  email: string
+  display_name?: string | null
+}
+
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -55,12 +62,14 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [participants, setParticipants] = useState<Participant[]>([])
   const [newMessage, setNewMessage] = useState('')
   const { onlineUsers } = usePresence()
-  const [user, setUser] = useState<{ id: string } | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [activeThread, setActiveThread] = useState<{
     messageId: string;
     content: string;
     sender: {
+      id: string;
       email: string;
+      display_name?: string | null;
     };
   } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -197,9 +206,16 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   useEffect(() => {
     const fetchUser = async () => {
       const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUser({ id: user.id })
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (authUser) {
+        // Fetch additional user data
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id, email, display_name')
+          .eq('id', authUser.id)
+          .single()
+        
+        setUser(userData)
       }
     }
     fetchUser()
@@ -424,7 +440,9 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     id: string;
     content: string;
     sender: {
+      id: string;
       email: string;
+      display_name?: string | null;
     };
   }) => {
     const newSearchParams = new URLSearchParams(searchParams)
@@ -451,40 +469,26 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         <h1 className="text-2xl font-bold mb-4 p-4">
           {conversation?.type === 'dm' ? (
             <div className="flex items-center">
-              Chat with {participants[0]?.display_name || participants[0]?.email}
-              {participants[0] && onlineUsers.has(participants[0].id) && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <span className="ml-2 text-green-500">●</span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Online</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+              Chat with{' '}
+              {participants[0] && (
+                <UserDisplay 
+                  user={participants[0]}
+                  isOnline={onlineUsers.has(participants[0].id)}
+                  className="ml-2"
+                />
               )}
             </div>
           ) : (
             <div>
               <div>{conversation?.name || 'Group Chat'}</div>
-              <div className="text-sm font-normal text-gray-500">
+              <div className="text-sm font-normal text-gray-500 flex flex-wrap gap-2">
                 {participants.map((p, i) => (
                   <span key={p.id}>
-                    {p.display_name || p.email}
-                    {onlineUsers.has(p.id) && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <span className="ml-1 text-green-500">●</span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Online</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {i < participants.length - 1 ? ', ' : ''}
+                    <UserDisplay 
+                      user={p}
+                      isOnline={onlineUsers.has(p.id)}
+                    />
+                    {i < participants.length - 1 ? ',' : ''}
                   </span>
                 ))}
               </div>
@@ -556,7 +560,11 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         <ConversationThreadComments 
           messageId={activeThread.messageId}
           conversationId={params.id}
-          originalMessage={activeThread}
+          originalMessage={{
+            id: activeThread.messageId,
+            content: activeThread.content,
+            sender: activeThread.sender
+          }}
           onClose={handleThreadClose}
         />
       )}

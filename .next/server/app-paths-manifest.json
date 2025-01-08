@@ -4,5 +4,7 @@
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/api/posts/route": "app/api/posts/route.js",
+  "/api/thread-comments/route": "app/api/thread-comments/route.js",
+  "/api/conversation-thread-comments/route": "app/api/conversation-thread-comments/route.js"
 }
