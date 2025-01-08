@@ -1,22 +1,34 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
-import { X, Waves } from 'lucide-react'
+import { X, Waves, MessageSquare } from 'lucide-react'
 import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import MessageDisplay from './MessageDisplay'
 
-interface Post {
-  id: string
-  content: string
-  channel_id?: string
-  post_id?: string
-  user_id: string
+interface Message {
+  id: string;
+  content: string;
+  conversation_id: string;
+  user_id: string;
   user: {
-    id: string
-    display_name: string
-    email?: string
-  }
+    id: string;
+    display_name: string;
+    email?: string;
+  };
+}
+
+interface Post {
+  id: string;
+  content: string;
+  channel_id?: string;
+  post_id?: string;
+  user_id: string;
+  user: {
+    id: string;
+    display_name: string;
+    email?: string;
+  };
 }
 
 interface ThreadComment {
@@ -78,9 +90,28 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
       if (threadError) throw threadError
 
+      const { data: userConversations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      const { data: messages, error: messageError } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          content,
+          conversation_id,
+          sender_id
+        `)
+        .in('conversation_id', userConversations?.map(c => c.conversation_id) || [])
+        .ilike('content', `%${searchQuery}%`);
+
+      if (messageError) throw messageError;
+
       const userIds = [
         ...posts.map(post => post.user_id), 
-        ...(threadComments?.map(comment => comment.user_id) || [])
+        ...(threadComments?.map(comment => comment.user_id) || []),
+        ...(messages?.map(message => message.sender_id) || [])
       ];
 
       const { data: users, error: userError } = await supabase
@@ -101,9 +132,15 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
         user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
       }))
 
-      setSearchResults([...postsWithUser, ...threadCommentsWithUser])
+      const messagesWithUser = (messages || []).map(message => ({
+        ...message,
+        user_id: message.sender_id,
+        user: users.find(u => u.id === message.sender_id) || { id: '', display_name: '' }
+      }))
+
+      setSearchResults([...postsWithUser, ...threadCommentsWithUser, ...messagesWithUser])
     } catch (error) {
-      console.error('Error searching posts:', error)
+      console.error('Error searching:', error)
     } finally {
       setIsLoading(false)
     }
@@ -140,10 +177,14 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     };
   }, [isOpen]);
 
-  const handleResultClick = (item: Post) => {
+  const handleResultClick = (item: Post | Message) => {
     handleClose();
-    const threadId = item.post_id || item.id;
-    router.push(`/channel/${item.channel_id}?thread=${threadId}`);
+    if ('conversation_id' in item) {
+      router.push(`/dm/${item.conversation_id}?thread=${item.id}`);
+    } else {
+      const threadId = item.post_id || item.id;
+      router.push(`/channel/${item.channel_id}?thread=${threadId}`);
+    }
   };
 
   if (!isOpen) return null
@@ -199,7 +240,11 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               onThreadOpen={() => handleResultClick(item)}
               hideActions={true}
             />
-            {item.post_id && <Waves className="h-4 w-4 text-gray-500" />}
+            {'conversation_id' in item ? (
+              <MessageSquare className="h-4 w-4 text-gray-500" />
+            ) : item.post_id ? (
+              <Waves className="h-4 w-4 text-gray-500" />
+            ) : null}
           </div>
         ))}
       </div>
