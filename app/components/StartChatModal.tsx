@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 interface User {
   id: string
   email: string
+  display_name?: string | null
 }
 
 interface StartChatModalProps {
@@ -54,7 +55,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
     const { data, error } = await supabase
       .from('users')
-      .select('id, email')
+      .select('id, email, display_name')
       .neq('id', currentUser?.id)
       .order('email')
 
@@ -113,7 +114,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-      <div className={`${theme.colors.background} ${theme.colors.foreground} rounded-lg p-6 w-96 border ${theme.colors.border}`}>
+      <div className={`${theme.colors.background} ${theme.colors.foreground} rounded-lg p-6 w-96`}>
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Start a New Chat</h2>
           <button 
@@ -131,7 +132,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
               key={user.id} 
               className="bg-indigo-100 rounded-full px-3 py-1 text-sm flex items-center text-indigo-700"
             >
-              <span>{user.email}</span>
+              <span>{user.display_name || user.email}</span>
               <button
                 onClick={() => setSelectedUsers(users => users.filter(u => u.id !== user.id))}
                 className="ml-2 hover:bg-indigo-50 p-1 rounded-full"
@@ -160,7 +161,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
                 }
               }}
             >
-              {user.email}
+              {user.display_name || user.email}
             </div>
           ))}
         </div>
