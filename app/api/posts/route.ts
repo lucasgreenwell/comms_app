@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const userIds = [...new Set(posts.map(post => post.user_id))]
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, email')
+      .select('id, email, display_name')
       .in('id', userIds)
 
     if (usersError) throw usersError
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     // Transform posts to include files array
     const postsWithUserInfo = posts.map(post => ({
       ...post,
-      user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User' },
+      user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User', display_name: null },
       files: post.file_attachments?.map(attachment => attachment.files) || []
     }))
 

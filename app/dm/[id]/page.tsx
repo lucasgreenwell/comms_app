@@ -24,6 +24,7 @@ interface Message {
   sender: {
     id: string
     email: string
+    display_name?: string | null
   }
   files?: {
     id: string
@@ -43,6 +44,7 @@ interface Conversation {
 interface Participant {
   id: string
   email: string
+  display_name?: string | null
 }
 
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
@@ -226,7 +228,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     // Fetch all participants except current user
     const { data: participantsData, error: partError } = await supabase
       .from('conversation_participants')
-      .select('user:users!conversation_participants_user_id_fkey (id, email)')
+      .select('user:users!conversation_participants_user_id_fkey (id, email, display_name)')
       .eq('conversation_id', params.id)
       .neq('user_id', user.id)
 
@@ -277,7 +279,8 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         created_at,
         sender:sender_id(
           id,
-          email
+          email,
+          display_name
         ),
         files:file_attachments(
           id,
@@ -448,7 +451,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         <h1 className="text-2xl font-bold mb-4 p-4">
           {conversation?.type === 'dm' ? (
             <div className="flex items-center">
-              Chat with {participants[0]?.email}
+              Chat with {participants[0]?.display_name || participants[0]?.email}
               {participants[0] && onlineUsers.has(participants[0].id) && (
                 <TooltipProvider>
                   <Tooltip>
@@ -468,7 +471,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
               <div className="text-sm font-normal text-gray-500">
                 {participants.map((p, i) => (
                   <span key={p.id}>
-                    {p.email}
+                    {p.display_name || p.email}
                     {onlineUsers.has(p.id) && (
                       <TooltipProvider>
                         <Tooltip>

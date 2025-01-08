@@ -49,7 +49,7 @@ export async function GET(request: Request) {
     const userIds = [...new Set(comments.map(comment => comment.user_id))]
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, email')
+      .select('id, email, display_name')
       .in('id', userIds)
 
     if (usersError) throw usersError
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
     // Transform comments to include files array
     const commentsWithUserInfo = comments.map(comment => ({
       ...comment,
-      user: users?.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User' },
+      user: users?.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User', display_name: null },
       files: comment.file_attachments?.map(attachment => attachment.files) || []
     }))
 

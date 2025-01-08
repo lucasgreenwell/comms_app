@@ -14,6 +14,7 @@ interface MessageItemProps {
     sender: {
       id: string;
       email: string;
+      display_name?: string | null;
     };
     files?: {
       id: string;
@@ -32,6 +33,7 @@ interface MessageItemProps {
     content: string;
     sender: {
       email: string;
+      display_name?: string | null;
     };
   }) => void;
 }
@@ -230,7 +232,7 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
     return (
       <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
         <div className="font-bold flex items-center">
-          {message.sender.email}
+          {message.sender.display_name || message.sender.email}
           {onlineUsers.has(message.sender.id) && (
             <TooltipProvider>
               <Tooltip>
@@ -272,7 +274,7 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
       <div className="flex justify-between items-start">
         <div className="flex-1">
           <p className={`font-bold flex items-center ${theme.colors.foreground}`}>
-            {message.sender.email}
+            {message.sender.display_name || message.sender.email}
             {onlineUsers.has(message.sender.id) && (
               <TooltipProvider>
                 <Tooltip>

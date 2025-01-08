@@ -8,6 +8,8 @@ import { themes, Theme } from '../config/themes'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
+import { Input } from '@/components/ui/input'
+import { toast } from 'react-hot-toast'
 
 const THEME_STORAGE_KEY = 'slack-clone-theme'
 
@@ -19,6 +21,7 @@ export default function ProfilePage() {
     }
     return 'slate'
   })
+  const [displayName, setDisplayName] = useState<string>('')
   const router = useRouter()
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export default function ProfilePage() {
   const fetchUser = async () => {
     const currentUser = await getCurrentUser()
     setUser(currentUser)
+    setDisplayName(currentUser?.display_name || '')
   }
 
   const handleLogout = async () => {
@@ -47,6 +51,25 @@ export default function ProfilePage() {
     }, 100)
   }
 
+  const handleDisplayNameChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('users')
+        .update({ display_name: displayName })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      await fetchUser()
+      toast.success('Display name updated successfully!')
+    } catch (error) {
+      console.error('Error updating display name:', error)
+      toast.error('Failed to update display name')
+    }
+  }
+
   if (!user) return <div>Loading...</div>
 
   return (
@@ -55,7 +78,21 @@ export default function ProfilePage() {
       
       <Card className="p-6 mb-6">
         <h2 className="text-lg font-semibold mb-2">User Information</h2>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">
+        <form onSubmit={handleDisplayNameChange}>
+          <div className="mb-4">
+            <Label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+              Display Name
+            </Label>
+            <Input
+              id="displayName"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="mt-1 block w-full"
+            />
+          </div>
+          <Button type="submit">Update Display Name</Button>
+        </form>
+        <p className="text-gray-600 dark:text-gray-300 mt-4">
           Email: {user.email}
         </p>
       </Card>

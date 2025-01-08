@@ -17,6 +17,7 @@ interface ThreadComment {
   user: {
     id: string
     email: string
+    display_name?: string | null
   }
   files?: {
     id: string
@@ -34,6 +35,7 @@ interface ThreadCommentsProps {
     content: string
     user: {
       email: string
+      display_name?: string | null
     }
   }
 }
@@ -278,7 +280,7 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
       </div>
 
       <div className={`${theme.colors.background} p-4 border-b ${theme.colors.foreground}`}>
-        <div className={`font-bold ${theme.colors.foreground}`}>{originalPost.user.email}</div>
+        <div className={`font-bold ${theme.colors.foreground}`}>{originalPost.user.display_name || originalPost.user.email}</div>
         <div>{originalPost.content}</div>
       </div>
       

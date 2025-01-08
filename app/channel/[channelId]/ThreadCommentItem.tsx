@@ -15,6 +15,7 @@ interface ThreadComment {
   user: {
     id: string
     email: string
+    display_name?: string | null
   }
   files?: {
     id: string
@@ -192,7 +193,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
   if (isEditing) {
     return (
       <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
-        <div className="font-bold">{comment.user.email}</div>
+        <div className="font-bold">{comment.user.display_name || comment.user.email}</div>
         <div className="mt-2 flex gap-2">
           <Input
             type="text"
@@ -220,7 +221,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
     <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200`}>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className={`font-bold ${theme.colors.foreground}`}>{comment.user.email}</div>
+          <div className={`font-bold ${theme.colors.foreground}`}>{comment.user.display_name || comment.user.email}</div>
           <div className={theme.colors.foreground}>{comment.content}</div>
           {comment.files && comment.files.length > 0 && (
             <div className="mt-2 space-y-2">

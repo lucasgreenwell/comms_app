@@ -12,6 +12,7 @@ interface Post {
   user: {
     id: string
     email: string
+    display_name?: string | null
   }
   files?: {
     id: string
@@ -208,7 +209,7 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
     return (
       <div className={`${theme.colors.background} p-3 rounded transition-all duration-200`}>
         <div className="flex items-center">
-          <strong>{post.user.email}</strong>
+          <strong>{post.user.display_name || post.user.email}</strong>
         </div>
         <div className="mt-2 flex gap-2">
           <textarea
@@ -238,7 +239,7 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
     <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group mb-4 hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200`}>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className={`font-bold ${theme.colors.foreground}`}>{post.user.email}</div>
+          <div className={`font-bold ${theme.colors.foreground}`}>{post.user.display_name || post.user.email}</div>
           <div className={theme.colors.foreground}>{post.content}</div>
           {post.files && post.files.length > 0 && (
             <div className="mt-2 space-y-2">

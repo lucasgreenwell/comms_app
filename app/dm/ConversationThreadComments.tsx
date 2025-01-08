@@ -18,6 +18,7 @@ interface ThreadComment {
   user: {
     id: string
     email: string
+    display_name?: string | null
   }
   files?: {
     id: string
@@ -36,6 +37,7 @@ interface ConversationThreadCommentsProps {
     content: string
     sender: {
       email: string
+      display_name?: string | null
     }
   }
 }
@@ -279,7 +281,7 @@ export default function ConversationThreadComments({ messageId, conversationId, 
       </div>
 
       <div className={`${theme.colors.background} p-4 border-b ${theme.colors.foreground}`}>
-        <div className={`font-bold ${theme.colors.foreground}`}>{originalMessage.sender.email}</div>
+        <div className={`font-bold ${theme.colors.foreground}`}>{originalMessage.sender.display_name || originalMessage.sender.email}</div>
         <div>{originalMessage.content}</div>
       </div>
       

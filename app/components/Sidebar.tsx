@@ -39,6 +39,7 @@ interface DirectMessage {
   participants: {
     id: string
     email: string
+    display_name?: string
   }[]
 }
 
@@ -272,7 +273,8 @@ export default function Sidebar() {
           conversation_id,
           users!conversation_participants_user_id_fkey (
             id,
-            email
+            email,
+            display_name
           )
         `)
         .neq('user_id', user.id)
@@ -288,7 +290,7 @@ export default function Sidebar() {
         }
         acc[p.conversation_id].push(participant)
         return acc
-      }, {} as Record<string, { id: string; email: string }[]>)
+      }, {} as Record<string, { id: string; email: string; display_name?: string }[]>)
 
       // Combine conversation info with participants
       const processedDMs = userConversations?.map(conv => ({
@@ -431,12 +433,12 @@ export default function Sidebar() {
                     <div>
                       <span className="text-sm font-medium">{dm.name || 'Group Chat With'}</span>
                       <div className="text-xs">
-                        {dm.participants.map(p => p.email).join(', ')}
+                        {dm.participants.map(p => p.display_name || p.email).join(', ')}
                       </div>
                     </div>
                   ) : (
                     <>
-                      <span className="text-sm">{dm.participants[0]?.email}</span>
+                      <span className="text-sm">{dm.participants[0]?.display_name || dm.participants[0]?.email}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger>
@@ -466,7 +468,7 @@ export default function Sidebar() {
       <Link href="/profile">
         <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2 mb-1">
           <User className="mr-2 h-4 w-4" />
-          {currentUser?.email || 'Profile'}
+          Profile
         </Button>
       </Link>
       <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2" onClick={handleLogout}>

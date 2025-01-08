@@ -79,16 +79,17 @@ export async function GET(request: Request) {
 
     // Fetch user data
     const userIds = [...new Set(transformedComments.map(comment => comment.user_id))]
-    const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers({
-      filter: `id.in.(${userIds.join(',')})`
-    } as any) // Type assertion needed due to Supabase types not being up to date
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, email, display_name')
+      .in('id', userIds)
 
     if (usersError) throw usersError
 
     // Combine comment data with user data
     const commentsWithUserInfo = transformedComments.map(comment => ({
       ...comment,
-      user: users.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User' }
+      user: users?.find(user => user.id === comment.user_id) || { id: comment.user_id, email: 'Unknown User', display_name: null }
     }))
 
     return NextResponse.json(commentsWithUserInfo)
