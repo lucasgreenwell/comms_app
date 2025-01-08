@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { User, LogOut, Plus, MessageSquare } from 'lucide-react'
+import { User, LogOut, Plus, MessageSquare, Search } from 'lucide-react'
 import { themes } from '../config/themes'
 import {
   Tooltip,
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/tooltip"
 import StartChatModal from './StartChatModal'
 import { usePresence } from '../hooks/usePresence'
+import SearchModal from './SearchModal'
 
 interface Channel {
   id: string
@@ -41,11 +42,19 @@ interface DirectMessage {
   }[]
 }
 
+interface Post {
+  id: string
+  content: string
+  channel_id: string
+}
+
 export default function Sidebar() {
   const [channels, setChannels] = useState<Channel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newChannelName, setNewChannelName] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Post[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [theme, setTheme] = useState(() => {
@@ -60,6 +69,7 @@ export default function Sidebar() {
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([])
   const [isStartChatOpen, setIsStartChatOpen] = useState(false)
   const { onlineUsers } = usePresence()
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   useEffect(() => {
     fetchChannels()
@@ -283,8 +293,8 @@ export default function Sidebar() {
       // Combine conversation info with participants
       const processedDMs = userConversations?.map(conv => ({
         conversation_id: conv.conversation_id,
-        type: conv.conversation.type,
-        name: conv.conversation.name,
+        type: conv.conversation?.[0]?.type,
+        name: conv.conversation?.[0]?.name,
         participants: participantsByConversation[conv.conversation_id] || []
       })) || []
 
@@ -294,12 +304,39 @@ export default function Sidebar() {
     }
   }
 
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('No user found')
+
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select('id, content, channel_id')
+        .ilike('content', `%${searchQuery}%`)
+        .in('channel_id', channels.map(c => c.id))
+
+      if (error) throw error
+      setSearchResults(posts || [])
+    } catch (error) {
+      console.error('Error searching posts:', error)
+      setError('Failed to search posts')
+    }
+  }
+
   if (loading) return <div>Loading...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
     <aside className={`w-64 ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
-      <h2 className="text-xl font-bold mb-4">Channels</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold">Channels</h2>
+        <Button onClick={() => setIsSearchOpen(true)} variant="ghost" size="icon">
+          <Search className="h-5 w-5" />
+        </Button>
+      </div>
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <ul className="mb-2 overflow-y-auto max-h-[150px]">
         {channels.map((channel) => (
           <li key={channel.id} className="mb-2">
