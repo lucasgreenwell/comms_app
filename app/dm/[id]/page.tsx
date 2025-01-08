@@ -15,6 +15,7 @@ import ConversationThreadComments from '../ConversationThreadComments'
 import { Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from "@/components/ui/use-toast"
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 
 interface Message {
   id: string
@@ -45,6 +46,8 @@ interface Participant {
 }
 
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [messages, setMessages] = useState<Message[]>([])
   const [conversation, setConversation] = useState<Conversation | null>(null)
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -122,6 +125,21 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
       channel.unsubscribe()
     }
   }, [params.id])
+
+  // Add effect to handle thread ID from URL
+  useEffect(() => {
+    const threadId = searchParams.get('thread')
+    if (threadId && messages.length > 0) {
+      const message = messages.find(m => m.id === threadId)
+      if (message) {
+        setActiveThread({
+          messageId: message.id,
+          content: message.content,
+          sender: message.sender
+        })
+      }
+    }
+  }, [searchParams, messages])
 
   // File subscriptions
   useEffect(() => {
@@ -398,10 +416,36 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     }
   }
 
+  // Modify the onThreadOpen handler to update URL
+  const handleThreadOpen = (message: {
+    id: string;
+    content: string;
+    sender: {
+      email: string;
+    };
+  }) => {
+    const newSearchParams = new URLSearchParams(searchParams)
+    newSearchParams.set('thread', message.id)
+    router.push(`/dm/${params.id}?${newSearchParams.toString()}`)
+    setActiveThread({
+      messageId: message.id,
+      content: message.content,
+      sender: message.sender
+    })
+  }
+
+  // Modify the thread close handler to remove thread from URL
+  const handleThreadClose = () => {
+    const newSearchParams = new URLSearchParams(searchParams)
+    newSearchParams.delete('thread')
+    router.push(`/dm/${params.id}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`)
+    setActiveThread(null)
+  }
+
   return (
     <div className="flex h-full">
-      <div className={`flex-1 flex flex-col p-4 ${activeThread ? 'max-w-[calc(100%-400px)]' : ''}`}>
-        <h1 className="text-2xl font-bold mb-4">
+      <div className={`flex-1 flex flex-col h-full ${activeThread ? 'max-w-[calc(100%-400px)]' : ''}`}>
+        <h1 className="text-2xl font-bold mb-4 p-4">
           {conversation?.type === 'dm' ? (
             <div className="flex items-center">
               Chat with {participants[0]?.email}
@@ -444,22 +488,20 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             </div>
           )}
         </h1>
-        <div className="space-y-4 mb-4 max-h-[calc(100vh-200px)] overflow-y-auto">
-          {messages.map((message) => (
-            <MessageItem 
-              key={message.id} 
-              message={message} 
-              currentUser={user} 
-              onlineUsers={onlineUsers}
-              onThreadOpen={(message) => setActiveThread({
-                messageId: message.id,
-                content: message.content,
-                sender: message.sender
-              })}
-            />
-          ))}
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 p-4">
+            {messages.map((message) => (
+              <MessageItem 
+                key={message.id} 
+                message={message} 
+                currentUser={user} 
+                onlineUsers={onlineUsers}
+                onThreadOpen={handleThreadOpen}
+              />
+            ))}
+          </div>
         </div>
-        <form onSubmit={sendMessage} className="space-y-2">
+        <form onSubmit={sendMessage} className="p-4 border-t space-y-2">
           <div className="flex gap-2">
             <input
               type="text"
@@ -512,7 +554,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           messageId={activeThread.messageId}
           conversationId={params.id}
           originalMessage={activeThread}
-          onClose={() => setActiveThread(null)}
+          onClose={handleThreadClose}
         />
       )}
     </div>

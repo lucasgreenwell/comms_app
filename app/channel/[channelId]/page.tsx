@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { getSupabase, getCurrentUser } from '../../auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -29,13 +29,14 @@ interface Channel {
 
 export default function Channel() {
   const { channelId } = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [newMessage, setNewMessage] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [channel, setChannel] = useState<Channel | null>(null)
-  const router = useRouter()
   const [activeThread, setActiveThread] = useState<{
     postId: string;
     content: string;
@@ -59,6 +60,20 @@ export default function Channel() {
   useEffect(() => {
     scrollToBottom()
   }, [posts])
+
+  useEffect(() => {
+    const threadId = searchParams.get('thread')
+    if (threadId && posts.length > 0) {
+      const post = posts.find(p => p.id === threadId)
+      if (post) {
+        setActiveThread({
+          postId: post.id,
+          content: post.content,
+          user: post.user
+        })
+      }
+    }
+  }, [searchParams, posts])
 
   const fetchPosts = async () => {
     setLoading(true)
@@ -295,6 +310,30 @@ export default function Channel() {
     }
   }
 
+  const handleThreadOpen = (post: {
+    id: string;
+    content: string;
+    user: {
+      email: string;
+    };
+  }) => {
+    const newSearchParams = new URLSearchParams(searchParams)
+    newSearchParams.set('thread', post.id)
+    router.push(`/channel/${channelId}?${newSearchParams.toString()}`)
+    setActiveThread({
+      postId: post.id,
+      content: post.content,
+      user: post.user
+    })
+  }
+
+  const handleThreadClose = () => {
+    const newSearchParams = new URLSearchParams(searchParams)
+    newSearchParams.delete('thread')
+    router.push(`/channel/${channelId}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`)
+    setActiveThread(null)
+  }
+
   if (loading) return <div>Loading posts...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
@@ -322,11 +361,7 @@ export default function Channel() {
                 key={post.id} 
                 post={post} 
                 onPostUpdate={fetchPosts}
-                onThreadOpen={(post) => setActiveThread({
-                  postId: post.id,
-                  content: post.content,
-                  user: post.user
-                })}
+                onThreadOpen={handleThreadOpen}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -382,7 +417,7 @@ export default function Channel() {
         <ThreadComments 
           postId={activeThread.postId} 
           originalPost={activeThread}
-          onClose={() => setActiveThread(null)} 
+          onClose={handleThreadClose} 
         />
       )}
     </div>
