@@ -6,7 +6,9 @@ import { usePresence } from '../../hooks/usePresence'
 interface Post {
   id: string
   user_id: string
+  channel_id: string
   content: string
+  created_at: string
   user: {
     id: string
     email: string
@@ -24,15 +26,7 @@ interface Post {
 interface PostItemProps {
   post: Post
   onPostUpdate: (updatedPost: Post) => void
-  onThreadOpen: (post: {
-    id: string
-    content: string
-    user: {
-      id: string
-      email: string
-      display_name?: string | null
-    }
-  }) => void
+  onThreadOpen: (post: Post) => void
 }
 
 export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemProps) {
@@ -75,11 +69,7 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
       onlineUsers={onlineUsers}
       messageType="post"
       threadCount={threadCount}
-      onThreadOpen={() => onThreadOpen({
-        id: post.id,
-        content: post.content,
-        user: post.user
-      })}
+      onThreadOpen={() => onThreadOpen(post)}
       onUpdate={handleUpdate}
       tableName="posts"
       className="mb-4"

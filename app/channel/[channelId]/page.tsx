@@ -21,6 +21,13 @@ interface Post {
     email: string
     display_name?: string | null
   }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+  }[]
 }
 
 interface Channel {
@@ -98,6 +105,11 @@ export default function Channel() {
 
   const setupRealtimeSubscription = () => {
     const supabase = getSupabase()
+
+    // Get all post IDs and file IDs for filters
+    const postIds = posts.map(p => p.id)
+    const fileIds = posts.flatMap(p => p.files || []).map(f => f.id)
+
     let channel = supabase.channel(`public:posts:channel_id=eq.${channelId}`)
 
     // Listen for post changes
@@ -150,32 +162,88 @@ export default function Channel() {
       }
     )
 
-    // Listen for file attachment changes
-    if (posts.length > 0) {
+    // Only add file_attachments subscription if we have posts
+    if (postIds.length > 0) {
       channel = channel.on('postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'file_attachments',
-          filter: `post_id=in.(${posts.map(p => p.id).join(',')})`
+          filter: `post_id=in.(${postIds.join(',')})`
         },
         () => {
-          fetchPosts() // Refetch to get updated file attachments
+          // Instead of refetching, update the posts state
+          const fetchPostFiles = async () => {
+            const { data: attachments } = await getSupabase()
+              .from('file_attachments')
+              .select(`
+                post_id,
+                file:files(
+                  id,
+                  file_name,
+                  file_type,
+                  file_size,
+                  path
+                )
+              `)
+              .in('post_id', postIds);
+
+            if (attachments) {
+              const filesByPostId = attachments.reduce((acc: any, curr) => {
+                if (!acc[curr.post_id]) {
+                  acc[curr.post_id] = [];
+                }
+                if (curr.file) {
+                  acc[curr.post_id].push(curr.file);
+                }
+                return acc;
+              }, {});
+
+              setPosts(prevPosts => 
+                prevPosts.map(post => ({
+                  ...post,
+                  files: filesByPostId[post.id] || []
+                }))
+              );
+            }
+          };
+          fetchPostFiles();
         }
       )
     }
 
-    // Listen for file changes
-    channel = channel.on('postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'files'
-      },
-      () => {
-        fetchPosts() // Refetch to get updated file data
-      }
-    )
+    // Only add files subscription if we have files
+    if (fileIds.length > 0) {
+      channel = channel.on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'files',
+          filter: `id=in.(${fileIds.join(',')})`
+        },
+        () => {
+          // Instead of refetching, update the posts state
+          const fetchUpdatedFiles = async () => {
+            const { data: files } = await getSupabase()
+              .from('files')
+              .select('*')
+              .in('id', fileIds);
+
+            if (files) {
+              setPosts(prevPosts => 
+                prevPosts.map(post => ({
+                  ...post,
+                  files: post.files?.map(f => 
+                    files.find(newFile => newFile.id === f.id) || f
+                  )
+                }))
+              );
+            }
+          };
+          fetchUpdatedFiles();
+        }
+      )
+    }
 
     channel.subscribe()
 
@@ -340,13 +408,7 @@ export default function Channel() {
     }
   }
 
-  const handleThreadOpen = (post: {
-    id: string;
-    content: string;
-    user: {
-      email: string;
-    };
-  }) => {
+  const handleThreadOpen = (post: Post) => {
     const newSearchParams = new URLSearchParams(searchParams)
     newSearchParams.set('thread', post.id)
     router.push(`/channel/${channelId}?${newSearchParams.toString()}`)
