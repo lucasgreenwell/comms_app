@@ -12,11 +12,18 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'react-hot-toast'
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { User } from '@supabase/supabase-js'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const THEME_STORAGE_KEY = 'slack-clone-theme'
 
 interface ExtendedUser extends User {
   display_name?: string | null;
+  native_language?: string | null;
+}
+
+interface Language {
+  id: string;
+  language: string;
 }
 
 export default function ProfilePage() {
@@ -30,20 +37,39 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState<string>('')
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [languages, setLanguages] = useState<Language[]>([])
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('')
   const router = useRouter()
 
   useEffect(() => {
     fetchUser()
+    fetchLanguages()
   }, [])
 
   useEffect(() => {
     localStorage.setItem(THEME_STORAGE_KEY, selectedTheme)
   }, [selectedTheme])
 
+  const fetchLanguages = async () => {
+    const supabase = getSupabase()
+    const { data, error } = await supabase
+      .from('top_languages')
+      .select('*')
+      .order('language')
+    
+    if (error) {
+      console.error('Error fetching languages:', error)
+      return
+    }
+    
+    setLanguages(data)
+  }
+
   const fetchUser = async () => {
-    const currentUser = await getCurrentUser()
+    const currentUser = await getCurrentUser() as ExtendedUser
     setUser(currentUser)
     setDisplayName(currentUser?.display_name || '')
+    setSelectedLanguage(currentUser?.native_language || '')
     
     if (currentUser) {
       const supabase = getSupabase()
@@ -58,7 +84,9 @@ export default function ProfilePage() {
   }
 
   const handleProfilePicUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) return;
+    const currentUser = user
+    if (!currentUser?.id) return
+
     try {
       if (!e.target.files || !e.target.files[0]) return;
 
@@ -73,7 +101,7 @@ export default function ProfilePage() {
       
       // Upload the file
       const fileExt = file.name.split('.').pop()
-      const filePath = `${user.id}/${Date.now()}.${fileExt}`
+      const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`
       
       const { error: uploadError } = await supabase.storage
         .from('profile-pics')
@@ -92,7 +120,7 @@ export default function ProfilePage() {
       const { error: updateError } = await supabase
         .from('user_profiles')
         .upsert({
-          id: user.id,
+          id: currentUser.id,
           profile_pic_url: publicUrl
         })
 
@@ -123,12 +151,15 @@ export default function ProfilePage() {
 
   const handleDisplayNameChange = async (e: React.FormEvent) => {
     e.preventDefault()
+    const currentUser = user
+    if (!currentUser?.id) return
+
     try {
       const supabase = getSupabase()
       const { error } = await supabase
         .from('users')
         .update({ display_name: displayName })
-        .eq('id', user.id)
+        .eq('id', currentUser.id)
 
       if (error) throw error
 
@@ -137,6 +168,26 @@ export default function ProfilePage() {
     } catch (error) {
       console.error('Error updating display name:', error)
       toast.error('Failed to update display name')
+    }
+  }
+
+  const handleLanguageChange = async (value: string) => {
+    if (!user?.id) return
+    
+    try {
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('users')
+        .update({ native_language: value })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setSelectedLanguage(value)
+      toast.success('Language preference updated successfully!')
+    } catch (error) {
+      console.error('Error updating language:', error)
+      toast.error('Failed to update language preference')
     }
   }
 
@@ -186,6 +237,23 @@ export default function ProfilePage() {
               onChange={(e) => setDisplayName(e.target.value)}
               className="mt-1 block w-full"
             />
+          </div>
+          <div className="mb-4">
+            <Label htmlFor="language" className="block text-sm font-medium text-gray-700">
+              Preferred Language
+            </Label>
+            <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a language" />
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.id} value={lang.id}>
+                    {lang.language}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <Button type="submit">Update Display Name</Button>
         </form>
