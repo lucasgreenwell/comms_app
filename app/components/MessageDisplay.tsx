@@ -460,7 +460,10 @@ export default function MessageDisplay({
   const maxWidth = messageType === 'dm' ? 'max-w-[45%]' : '';
 
   return (
-    <div className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200 ${messageAlignment} ${maxWidth} ${className}`}>
+    <div
+      className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200 ${messageAlignment} ${maxWidth} ${className}`}
+      style={{ position: 'relative' }}
+    >
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
           <UserDisplay 
@@ -474,7 +477,13 @@ export default function MessageDisplay({
                 <div className={theme.colors.foreground}>{content}</div>
               </TooltipTrigger>
               {getTranslatedContent() && (
-                <TooltipContent>
+                <TooltipContent
+                  style={{
+                    zIndex: 1000,
+                    whiteSpace: 'normal',
+                    maxWidth: '200px',
+                  }}
+                >
                   <p>{getTranslatedContent()}</p>
                 </TooltipContent>
               )}
