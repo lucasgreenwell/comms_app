@@ -47,6 +47,21 @@ interface MessageItemProps {
 }
 
 export default function MessageItem({ message, currentUser, onlineUsers, onThreadOpen }: MessageItemProps) {
+  const [translation, setTranslation] = useState(message.translation);
+
+  const handleUpdate = async () => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from('translations')
+      .select('*')
+      .eq('message_id', message.id)
+      .single();
+
+    if (!error && data) {
+      setTranslation(data);
+    }
+  };
+
   return (
     <MessageDisplay
       id={message.id}
@@ -57,9 +72,9 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
       onlineUsers={onlineUsers}
       messageType="dm"
       onThreadOpen={onThreadOpen}
-      onUpdate={() => {}}
+      onUpdate={handleUpdate}
       tableName="messages"
-      translation={message.translation}
+      translation={translation}
     />
   );
 } 

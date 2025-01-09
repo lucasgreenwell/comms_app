@@ -398,8 +398,37 @@ export default function MessageDisplay({
     };
   }, [id]);
 
+  // Add separate subscription for translations
+  useEffect(() => {
+    if (!id) return;
+
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel(`translations:${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'translations',
+          filter: messageType === 'post' || messageType === 'post_thread' 
+            ? `post_id=eq.${id}` 
+            : `message_id=eq.${id}`
+        },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            onUpdate(content);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, messageType, content, onUpdate]);
+
   const getTranslatedContent = () => {
-    console.log(translation, currentUser?.native_language);
     if (!translation || !currentUser?.native_language) return null;
 
 // Map language UUID to translation field
@@ -418,7 +447,6 @@ export default function MessageDisplay({
   
 
     const translationField = translationMap[currentUser.native_language];
-    console.log(translationField);
     return translation[translationField];
   };
 
@@ -471,20 +499,23 @@ export default function MessageDisplay({
             isOnline={onlineUsers.has(user.id)}
             className={`font-bold ${theme.colors.foreground}`}
           />
-          <TooltipProvider>
+          <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className={theme.colors.foreground}>{content}</div>
               </TooltipTrigger>
               {getTranslatedContent() && (
                 <TooltipContent
+                  side="top"
+                  align="start"
+                  className="z-[9999] bg-white shadow-lg border rounded-lg p-3"
+                  sideOffset={5}
                   style={{
-                    zIndex: 1000,
-                    whiteSpace: 'normal',
-                    maxWidth: '200px',
+                    maxWidth: '300px',
+                    whiteSpace: 'pre-wrap',
                   }}
                 >
-                  <p>{getTranslatedContent()}</p>
+                  <p className="text-sm">{getTranslatedContent()}</p>
                 </TooltipContent>
               )}
             </Tooltip>

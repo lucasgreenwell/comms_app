@@ -704,6 +704,12 @@ video {
 .z-\[1\] {
   z-index: 1;
 }
+.z-\[9999\] {
+  z-index: 9999;
+}
+.z-\[99999\] {
+  z-index: 99999;
+}
 .col-span-3 {
   grid-column: span 3 / span 3;
 }
@@ -1374,6 +1380,10 @@ video {
 }
 .border-transparent {
   border-color: transparent;
+}
+.border-gray-200 {
+  --tw-border-opacity: 1;
+  border-color: rgb(229 231 235 / var(--tw-border-opacity, 1));
 }
 .border-l-transparent {
   border-left-color: transparent;
