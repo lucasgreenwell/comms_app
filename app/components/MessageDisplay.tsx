@@ -7,6 +7,12 @@ import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
 import UserDisplay from './UserDisplay';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface File {
   id: string;
@@ -20,6 +26,7 @@ interface User {
   id: string;
   email?: string;
   display_name?: string | null;
+  native_language?: string | null;
 }
 
 interface EmojiReaction {
@@ -27,6 +34,22 @@ interface EmojiReaction {
   emoji: string;
   user_id: string;
   created_at: string;
+}
+
+interface Translation {
+  id: string;
+  message_id: string | null;
+  conversation_thread_comment_id: string | null;
+  mandarin_chinese_translation: string | null;
+  spanish_translation: string | null;
+  english_translation: string | null;
+  hindi_translation: string | null;
+  arabic_translation: string | null;
+  bengali_translation: string | null;
+  portuguese_translation: string | null;
+  russian_translation: string | null;
+  japanese_translation: string | null;
+  western_punjabi_translation: string | null;
 }
 
 interface MessageDisplayProps {
@@ -43,6 +66,7 @@ interface MessageDisplayProps {
   tableName: string;
   className?: string;
   hideActions?: boolean;
+  translation?: Translation | null;
 }
 
 // Common emojis that will be available in the picker
@@ -61,7 +85,8 @@ export default function MessageDisplay({
   onUpdate,
   tableName,
   className = '',
-  hideActions
+  hideActions,
+  translation
 }: MessageDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
@@ -77,6 +102,7 @@ export default function MessageDisplay({
   useEffect(() => {
     loadReactions();
   }, [id]);
+
 
   const loadReactions = async () => {
     const supabase = getSupabase();
@@ -352,11 +378,17 @@ export default function MessageDisplay({
     const supabase = getSupabase();
     const channel = supabase
       .channel('reactions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'emoji_reactions' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emoji_reactions' }, (payload: any) => {
         if (payload.eventType === 'INSERT') {
-          setReactions(prev => [...prev, payload.new]);
+          const newReaction: EmojiReaction = {
+            id: payload.new.id,
+            emoji: payload.new.emoji,
+            user_id: payload.new.user_id,
+            created_at: payload.new.created_at
+          };
+          setReactions(prev => [...prev, newReaction]);
         } else if (payload.eventType === 'DELETE') {
-          setReactions(prev => prev.filter(r => r.id !== payload.old.id));
+          setReactions(prev => prev.filter(r => r.id !== payload.old?.id));
         }
       })
       .subscribe();
@@ -365,6 +397,30 @@ export default function MessageDisplay({
       supabase.removeChannel(channel);
     };
   }, [id]);
+
+  const getTranslatedContent = () => {
+    console.log(translation, currentUser?.native_language);
+    if (!translation || !currentUser?.native_language) return null;
+
+// Map language UUID to translation field
+    const translationMap: Record<string, keyof Translation> = {
+        '3823c9fa-ed84-4a19-906a-7e5639a9e3d8': 'portuguese_translation',    // Portuguese
+        '6292a2b1-7d7c-4223-958a-c4a0bbc0f8a3': 'bengali_translation',       // Bengali
+        '6483ffa6-c90c-43ea-b97e-e33a81c80262': 'russian_translation',       // Russian
+        '7e2490ff-ef43-47eb-9de7-59963b9b4f9c': 'hindi_translation',         // Hindi
+        '9b15d05b-c7ff-4ed6-99f9-13f19241d150': 'japanese_translation',      // Japanese
+        'a5a8f2e7-4046-4ea9-823f-2f549ce1880e': 'arabic_translation',        // Arabic
+        'a948dd0e-20de-4e99-8450-72aa52331ba3': 'english_translation',       // English
+        'b6e44df4-60ed-4064-9f55-9e5c0b4dddc4': 'western_punjabi_translation',// Western Punjabi
+        'baebecad-9aae-42c4-b595-44f2727a71be': 'mandarin_chinese_translation', // Mandarin Chinese
+        'f8465dcb-806e-470c-9f9b-9159e14f6903': 'spanish_translation',       // Spanish
+    };
+  
+
+    const translationField = translationMap[currentUser.native_language];
+    console.log(translationField);
+    return translation[translationField];
+  };
 
   if (isEditing) {
     return (
@@ -412,7 +468,18 @@ export default function MessageDisplay({
             isOnline={onlineUsers.has(user.id)}
             className={`font-bold ${theme.colors.foreground}`}
           />
-          <div className={theme.colors.foreground}>{content}</div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={theme.colors.foreground}>{content}</div>
+              </TooltipTrigger>
+              {getTranslatedContent() && (
+                <TooltipContent>
+                  <p>{getTranslatedContent()}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
           {files && files.length > 0 && (
             <div className="mt-2 space-y-2">
               {files.map((file) => (

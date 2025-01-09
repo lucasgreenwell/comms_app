@@ -1083,6 +1083,9 @@ video {
 .max-w-\[45\%\] {
   max-width: 45%;
 }
+.max-w-sm {
+  max-width: 24rem;
+}
 .flex-1 {
   flex: 1 1 0%;
 }
@@ -1166,6 +1169,9 @@ video {
 }
 .cursor-pointer {
   cursor: pointer;
+}
+.cursor-help {
+  cursor: help;
 }
 .touch-none {
   touch-action: none;
@@ -1656,6 +1662,9 @@ video {
 }
 .font-semibold {
   font-weight: 600;
+}
+.italic {
+  font-style: italic;
 }
 .tabular-nums {
   --tw-numeric-spacing: tabular-nums;

@@ -3,5 +3,6 @@
   "/dm/[id]/page": "app/dm/[id]/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/signup/page": "app/signup/page.js"
+  "/signup/page": "app/signup/page.js",
+  "/api/translations/route": "app/api/translations/route.js"
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getSupabase } from '../../auth'
+import { getCurrentUser, getSupabase } from '../../auth'
 import { usePresence } from '../../hooks/usePresence'
 import {
   Tooltip,
@@ -17,6 +17,22 @@ import { Button } from '@/components/ui/button'
 import { useToast } from "@/components/ui/use-toast"
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import UserDisplay from '../../components/UserDisplay'
+
+interface Translation {
+  id: string
+  message_id: string | null
+  conversation_thread_comment_id: string | null
+  mandarin_chinese_translation: string | null
+  spanish_translation: string | null
+  english_translation: string | null
+  hindi_translation: string | null
+  arabic_translation: string | null
+  bengali_translation: string | null
+  portuguese_translation: string | null
+  russian_translation: string | null
+  japanese_translation: string | null
+  western_punjabi_translation: string | null
+}
 
 interface Message {
   id: string
@@ -34,6 +50,16 @@ interface Message {
     file_size: number
     path: string
   }[]
+  translation: Translation | null
+}
+
+interface FileUpload {
+  id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  path: string
+  uploaded_by: string
 }
 
 interface Conversation {
@@ -52,6 +78,7 @@ interface User {
   id: string
   email: string
   display_name?: string | null
+  native_language?: string | null
 }
 
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
@@ -211,7 +238,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         // Fetch additional user data
         const { data: userData } = await supabase
           .from('users')
-          .select('id, email, display_name')
+          .select('id, email, display_name, native_language')
           .eq('id', authUser.id)
           .single()
         
@@ -285,6 +312,21 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           path: string;
         };
       }[] | null;
+      translations: {
+        id: string;
+        message_id: string | null;
+        conversation_thread_comment_id: string | null;
+        mandarin_chinese_translation: string | null;
+        spanish_translation: string | null;
+        english_translation: string | null;
+        hindi_translation: string | null;
+        arabic_translation: string | null;
+        bengali_translation: string | null;
+        portuguese_translation: string | null;
+        russian_translation: string | null;
+        japanese_translation: string | null;
+        western_punjabi_translation: string | null;
+      }[] | null;
     }
 
     const { data, error } = await supabase
@@ -307,6 +349,21 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             file_size,
             path
           )
+        ),
+        translations(
+          id,
+          message_id,
+          conversation_thread_comment_id,
+          mandarin_chinese_translation,
+          spanish_translation,
+          english_translation,
+          hindi_translation,
+          arabic_translation,
+          bengali_translation,
+          portuguese_translation,
+          russian_translation,
+          japanese_translation,
+          western_punjabi_translation
         )
       `)
       .eq('conversation_id', params.id)
@@ -329,7 +386,8 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         file_type: f.file.file_type,
         file_size: f.file.file_size,
         path: f.file.path
-      }))
+      })),
+      translation: msg.translations?.[0] || null
     })) || []
 
     setMessages(transformedMessages)
@@ -348,14 +406,13 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     e.preventDefault()
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
-    const supabase = getSupabase()
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) return
-
     try {
+      const user = await getCurrentUser()
+      if (!user) throw new Error('User not authenticated')
+      const supabase = getSupabase()
+
       // First, upload any files
-      const filePromises = selectedFiles.map(async (file) => {
+      const filePromises = selectedFiles.map(async (file: File) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `${user.id}/${fileName}`
@@ -383,7 +440,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
 
         if (fileRecordError) throw fileRecordError
 
-        return fileData
+        return fileData as FileUpload
       })
 
       const uploadedFiles = await Promise.all(filePromises)
@@ -413,6 +470,23 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           )
 
         if (attachmentError) throw attachmentError
+      }
+
+      // Trigger translation
+      try {
+        await fetch('/api/translations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messageId: messageData.id,
+            senderId: user.id
+          }),
+        })
+      } catch (translationError) {
+        console.error('Translation error:', translationError)
+        // Don't throw here - we still want to show the message even if translation fails
       }
 
       setNewMessage('')

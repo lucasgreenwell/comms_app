@@ -126,6 +126,23 @@ export async function POST(request: Request) {
 
     if (error) throw error
 
+    // Trigger translation for thread comments
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/translations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationThreadCommentId: commentData.id,
+          senderId: userId
+        }),
+      })
+    } catch (translationError) {
+      console.error('Translation error:', translationError)
+      // Don't throw here - we still want to return the comment even if translation fails
+    }
+
     return NextResponse.json(commentData)
   } catch (error) {
     console.error('Error creating thread comment:', error)

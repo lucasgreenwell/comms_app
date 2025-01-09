@@ -2,62 +2,51 @@ import { useState, useEffect } from 'react';
 import { getSupabase } from '../auth';
 import MessageDisplay from '../components/MessageDisplay';
 
-interface MessageItemProps {
-  message: {
+interface Message {
+  id: string;
+  content: string;
+  created_at: string;
+  sender: {
     id: string;
-    content: string;
-    sender: {
-      id: string;
-      email: string;
-      display_name?: string | null;
-    };
-    files?: {
-      id: string;
-      file_name: string;
-      file_type: string;
-      file_size: number;
-      path: string;
-    }[];
+    email: string;
+    display_name?: string | null;
   };
+  files?: {
+    id: string;
+    file_name: string;
+    file_type: string;
+    file_size: number;
+    path: string;
+  }[];
+  translation: {
+    id: string;
+    message_id: string | null;
+    conversation_thread_comment_id: string | null;
+    mandarin_chinese_translation: string | null;
+    spanish_translation: string | null;
+    english_translation: string | null;
+    hindi_translation: string | null;
+    arabic_translation: string | null;
+    bengali_translation: string | null;
+    portuguese_translation: string | null;
+    russian_translation: string | null;
+    japanese_translation: string | null;
+    western_punjabi_translation: string | null;
+  } | null;
+}
+
+interface MessageItemProps {
+  message: Message;
   currentUser: {
     id: string;
     email: string;
     display_name?: string | null;
   } | null;
   onlineUsers: Set<string>;
-  onThreadOpen: (message: {
-    id: string;
-    content: string;
-    sender: {
-      id: string;
-      email: string;
-      display_name?: string | null;
-    };
-  }) => void;
+  onThreadOpen?: (message: any) => void;
 }
 
 export default function MessageItem({ message, currentUser, onlineUsers, onThreadOpen }: MessageItemProps) {
-  const [threadCount, setThreadCount] = useState(0);
-
-  useEffect(() => {
-    fetchThreadCount();
-  }, []);
-
-  const fetchThreadCount = async () => {
-    try {
-      const supabase = getSupabase();
-      const { count, error } = await supabase
-        .from('conversation_thread_comments')
-        .select('id', { count: 'exact' })
-        .eq('message_id', message.id);
-
-      if (error) throw error;
-      setThreadCount(count || 0);
-    } catch (error) {
-      console.error('Error fetching thread count:', error);
-    }
-  };
-
   return (
     <MessageDisplay
       id={message.id}
@@ -67,14 +56,10 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
       currentUser={currentUser}
       onlineUsers={onlineUsers}
       messageType="dm"
-      threadCount={threadCount}
-      onThreadOpen={() => onThreadOpen({
-        id: message.id,
-        content: message.content,
-        sender: message.sender
-      })}
-      onUpdate={fetchThreadCount}
+      onThreadOpen={onThreadOpen}
+      onUpdate={() => {}}
       tableName="messages"
+      translation={message.translation}
     />
   );
 } 
