@@ -41,6 +41,16 @@ interface ThreadComment {
   };
 }
 
+interface ConversationThreadComment {
+  id: string;
+  content: string;
+  message_id: string;
+  user_id: string;
+  messages: {
+    conversation_id: string;
+  };
+}
+
 interface SearchModalProps {
   isOpen: boolean
   onClose: () => void
@@ -68,12 +78,19 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No user found')
 
+      const { data: userConversations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      const conversationIds = userConversations?.map(c => c.conversation_id) || [];
+
       const { data: posts, error: postError } = await supabase
         .from('posts')
         .select('id, content, channel_id, user_id')
-        .ilike('content', `%${searchQuery}%`)
+        .ilike('content', `%${searchQuery}%`);
 
-      if (postError) throw postError
+      if (postError) throw postError;
 
       const { data: threadComments, error: threadError } = await supabase
         .from('post_thread_comments')
@@ -88,12 +105,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
         `)
         .ilike('content', `%${searchQuery}%`) as { data: ThreadComment[] | null, error: any };
 
-      if (threadError) throw threadError
-
-      const { data: userConversations } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
+      if (threadError) throw threadError;
 
       const { data: messages, error: messageError } = await supabase
         .from('messages')
@@ -103,46 +115,74 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           conversation_id,
           sender_id
         `)
-        .in('conversation_id', userConversations?.map(c => c.conversation_id) || [])
+        .in('conversation_id', conversationIds)
         .ilike('content', `%${searchQuery}%`);
 
       if (messageError) throw messageError;
 
+      const { data: conversationThreadComments, error: convThreadError } = await supabase
+        .from('conversation_thread_comments')
+        .select(`
+          id,
+          content,
+          message_id,
+          user_id,
+          messages!inner (
+            conversation_id
+          )
+        `)
+        .in('messages.conversation_id', conversationIds)
+        .ilike('content', `%${searchQuery}%`) as { data: ConversationThreadComment[] | null, error: any };
+
+      if (convThreadError) throw convThreadError;
+
       const userIds = [
-        ...posts.map(post => post.user_id), 
+        ...posts.map(post => post.user_id),
         ...(threadComments?.map(comment => comment.user_id) || []),
-        ...(messages?.map(message => message.sender_id) || [])
+        ...(messages?.map(message => message.sender_id) || []),
+        ...(conversationThreadComments?.map(comment => comment.user_id) || [])
       ];
 
       const { data: users, error: userError } = await supabase
         .from('users')
         .select('id, display_name')
-        .in('id', userIds)
+        .in('id', userIds);
 
-      if (userError) throw userError
+      if (userError) throw userError;
 
       const postsWithUser = posts.map(post => ({
         ...post,
         user: users.find(u => u.id === post.user_id) || { id: '', display_name: '' }
-      }))
+      }));
 
       const threadCommentsWithUser = (threadComments || []).map(comment => ({
         ...comment,
         channel_id: comment.posts.channel_id,
         user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
-      }))
+      }));
 
       const messagesWithUser = (messages || []).map(message => ({
         ...message,
         user_id: message.sender_id,
         user: users.find(u => u.id === message.sender_id) || { id: '', display_name: '' }
-      }))
+      }));
 
-      setSearchResults([...postsWithUser, ...threadCommentsWithUser, ...messagesWithUser])
+      const conversationThreadCommentsWithUser = (conversationThreadComments || []).map(comment => ({
+        ...comment,
+        conversation_id: comment.messages.conversation_id,
+        user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
+      }));
+
+      setSearchResults([
+        ...postsWithUser,
+        ...threadCommentsWithUser,
+        ...messagesWithUser,
+        ...conversationThreadCommentsWithUser
+      ]);
     } catch (error) {
-      console.error('Error searching:', error)
+      console.error('Error searching:', error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -177,11 +217,16 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
     };
   }, [isOpen]);
 
-  const handleResultClick = (item: Post | Message) => {
+  const handleResultClick = (item: Post | Message | ConversationThreadComment) => {
     handleClose();
-    if ('conversation_id' in item) {
+    if ('message_id' in item) {
+      // Conversation thread comment
+      router.push(`/dm/${item.messages.conversation_id}?thread=${item.message_id}`);
+    } else if ('conversation_id' in item) {
+      // Direct message
       router.push(`/dm/${item.conversation_id}?thread=${item.id}`);
     } else {
+      // Post or post thread comment
       const threadId = item.post_id || item.id;
       router.push(`/channel/${item.channel_id}?thread=${threadId}`);
     }
@@ -240,11 +285,14 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               onThreadOpen={() => handleResultClick(item)}
               hideActions={true}
             />
-            {'conversation_id' in item ? (
-              <MessageSquare className="h-4 w-4 text-gray-500" />
-            ) : item.post_id ? (
-              <Waves className="h-4 w-4 text-gray-500" />
-            ) : null}
+            <div className="flex gap-1">
+              {'conversation_id' in item && (
+                <MessageSquare className="h-4 w-4 text-gray-500" />
+              )}
+              {(item.post_id || 'message_id' in item) && (
+                <Waves className="h-4 w-4 text-gray-500" />
+              )}
+            </div>
           </div>
         ))}
       </div>
