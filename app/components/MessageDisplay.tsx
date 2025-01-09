@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Trash2, X, Check, Waves, Download, FileIcon } from 'lucide-react';
+import { Edit2, Trash2, X, Check, Waves, Download, FileIcon, Smile } from 'lucide-react';
 import { getCurrentUser, getSupabase } from '../auth';
 import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
 import UserDisplay from './UserDisplay';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface File {
   id: string;
@@ -19,6 +20,13 @@ interface User {
   id: string;
   email?: string;
   display_name?: string | null;
+}
+
+interface EmojiReaction {
+  id: string;
+  emoji: string;
+  user_id: string;
+  created_at: string;
 }
 
 interface MessageDisplayProps {
@@ -36,6 +44,9 @@ interface MessageDisplayProps {
   className?: string;
   hideActions?: boolean;
 }
+
+// Common emojis that will be available in the picker
+const COMMON_EMOJIS = ['👍', '❤️', '😂', '🎉', '🚀', '👀', '💯', '✨'];
 
 export default function MessageDisplay({
   id,
@@ -61,6 +72,118 @@ export default function MessageDisplay({
     }
     return themes[0];
   });
+  const [reactions, setReactions] = useState<EmojiReaction[]>([]);
+
+  useEffect(() => {
+    loadReactions();
+  }, [id]);
+
+  const loadReactions = async () => {
+    const supabase = getSupabase();
+    let query = supabase
+      .from('emoji_reactions')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    // Add the appropriate condition based on message type
+    if (messageType === 'post') {
+      query = query.eq('post_id', id);
+    } else if (messageType === 'post_thread') {
+      query = query.eq('post_thread_comment_id', id);
+    } else if (messageType === 'dm') {
+      query = query.eq('message_id', id);
+    } else if (messageType === 'dm_thread') {
+      query = query.eq('conversation_thread_id', id);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error loading reactions:', error);
+      return;
+    }
+
+    setReactions(data || []);
+  };
+
+  const handleAddReaction = async (emoji: string) => {
+    if (!currentUser) return;
+
+    const supabase = getSupabase();
+    const reactionData: any = {
+      user_id: currentUser.id,
+      emoji,
+      created_at: new Date().toISOString(),
+    };
+
+    // Set the appropriate ID field based on message type
+    if (messageType === 'post') {
+      reactionData.post_id = id;
+    } else if (messageType === 'post_thread') {
+      reactionData.post_thread_comment_id = id;
+    } else if (messageType === 'dm') {
+      reactionData.message_id = id;
+    } else if (messageType === 'dm_thread') {
+      reactionData.conversation_thread_id = id;
+    }
+
+    const { data, error } = await supabase
+      .from('emoji_reactions')
+      .insert([reactionData])
+      .select();
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error adding reaction",
+        description: error.message
+      });
+      return;
+    }
+
+    if (data) {
+      setReactions([...reactions, data[0]]);
+      toast({
+        title: "Reaction added",
+        description: "Your reaction has been added to the message."
+      });
+    }
+  };
+
+  const handleRemoveReaction = async (reactionId: string) => {
+    if (!currentUser) return;
+
+    const supabase = getSupabase();
+    const { error } = await supabase
+      .from('emoji_reactions')
+      .delete()
+      .eq('id', reactionId)
+      .eq('user_id', currentUser.id);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error removing reaction",
+        description: error.message
+      });
+      return;
+    }
+
+    setReactions(reactions.filter(r => r.id !== reactionId));
+    toast({
+      title: "Reaction removed",
+      description: "Your reaction has been removed from the message."
+    });
+  };
+
+  // Group reactions by emoji
+  const groupedReactions = reactions.reduce((acc, reaction) => {
+    if (!acc[reaction.emoji]) {
+      acc[reaction.emoji] = [];
+    }
+    acc[reaction.emoji].push(reaction);
+    return acc;
+  }, {} as Record<string, EmojiReaction[]>);
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -225,6 +348,24 @@ export default function MessageDisplay({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  useEffect(() => {
+    const supabase = getSupabase();
+    const channel = supabase
+      .channel('reactions')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emoji_reactions' }, payload => {
+        if (payload.eventType === 'INSERT') {
+          setReactions(prev => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setReactions(prev => prev.filter(r => r.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
   if (isEditing) {
     return (
       <div className={`${theme.colors.background} p-3 rounded transition-all duration-200 ${className}`}>
@@ -308,6 +449,56 @@ export default function MessageDisplay({
               ))}
             </div>
           )}
+          {/* Emoji Reactions */}
+          <div className="mt-2 flex flex-wrap gap-1">
+            {Object.entries(groupedReactions).map(([emoji, reactions]) => (
+              <Button
+                key={emoji}
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 py-1 text-xs rounded-full hover:bg-accent"
+                onClick={() => {
+                  const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                  if (userReaction) {
+                    handleRemoveReaction(userReaction.id);
+                  } else {
+                    handleAddReaction(emoji);
+                  }
+                }}
+              >
+                <span className="mr-1">{emoji}</span>
+                <span>{reactions.length}</span>
+              </Button>
+            ))}
+            {currentUser && !hideActions && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Smile className="h-3 w-3" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2">
+                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                    {COMMON_EMOJIS.map((emoji) => (
+                      <Button
+                        key={emoji}
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 hover:bg-accent"
+                        onClick={() => handleAddReaction(emoji)}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         </div>
         <div className="flex gap-1">
           {showThread && onThreadOpen && !hideActions && (

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface UserDisplayProps {
   user: {
     id: string;
-    email: string;
+    email?: string;
     display_name?: string | null;
   };
   showPresence?: boolean;
@@ -24,7 +24,7 @@ export default function UserDisplay({
   sidebarColor = 'rgb(59, 73, 223)' // default blue color
 }: UserDisplayProps) {
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
-  const displayName = user.display_name || user.email;
+  const displayName = user.display_name || user.email || 'Anonymous User';
   const initials = displayName
     .split(' ')
     .map(n => n[0])

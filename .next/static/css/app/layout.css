@@ -794,6 +794,9 @@ video {
 .mr-\[50\%\] {
   margin-right: 50%;
 }
+.mr-1 {
+  margin-right: 0.25rem;
+}
 .block {
   display: block;
 }
