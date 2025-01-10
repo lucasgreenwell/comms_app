@@ -1,14 +1,50 @@
-import { getSupabase } from './auth'
+"use client";
 
-export default async function Home() {
-  const supabase = getSupabase()
-  const { data: { session } } = await supabase.auth.getSession()
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { getCurrentUser, supabase } from './auth';
+import { toast } from 'react-hot-toast';
 
-  return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Welcome to Slack Clone</h1>
-      <p>Select a channel from the sidebar to start chatting!</p>
-    </div>
-  )
+export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAndRedirect = async () => {
+      const user = await getCurrentUser();
+      if (!user) {
+        // Handle unauthenticated state if needed
+        return;
+      }
+
+      const { data: memberships, error } = await supabase
+        .from('channel_members')
+        .select('*')
+        .eq('channel_id', 'ba3a0cd2-ed05-4f8b-9586-3c1dda9d6338')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error fetching memberships:', error);
+        return;
+      }
+
+      if (!memberships || memberships.length === 0) {
+        // Add user to the general channel
+        await supabase.from('channel_members').insert({
+          channel_id: 'ba3a0cd2-ed05-4f8b-9586-3c1dda9d6338',
+          user_id: user.id,
+        });
+        
+        // Show toast notification
+        toast("You've been added to the #general channel 🎉 Welcome!");
+      }
+
+      // Redirect to the general channel
+      router.push('/channel/ba3a0cd2-ed05-4f8b-9586-3c1dda9d6338');
+    };
+
+    checkAndRedirect();
+  }, [router]);
+
+  return null;
 }
 

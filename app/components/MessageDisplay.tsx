@@ -513,7 +513,6 @@ export default function MessageDisplay({
   }
 
   const isCurrentUser = currentUser?.id === user.id;
-  console.log(user.native_language, currentUser?.native_language);
 
   return (
     <div
