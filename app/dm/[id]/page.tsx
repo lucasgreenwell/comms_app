@@ -106,6 +106,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   useEffect(() => {
     fetchMessages()
     fetchConversationAndParticipants()
+    updateLastReadTimestamp()
 
     // Set up real-time subscription
     const supabase = getSupabase()
@@ -542,6 +543,61 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     router.push(`/dm/${params.id}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`)
     setActiveThread(null)
   }
+
+  const updateLastReadTimestamp = async () => {
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return
+
+      // First check if the participant record exists
+      const { data: participant, error: participantError } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, user_id, last_read_at')
+        .eq('conversation_id', params.id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (participantError) {
+        console.error('Error checking participant:', participantError)
+        return
+      }
+
+      if (!participant) {
+        console.error('User is not a participant in this conversation')
+        return
+      }
+
+      console.log('Found participant record:', participant)
+
+      // Now update the last_read_at timestamp
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .update({ 
+          last_read_at: new Date().toISOString() 
+        })
+        .eq('conversation_id', params.id)
+        .eq('user_id', user.id)
+        .select('conversation_id, user_id, last_read_at')
+
+      if (error) {
+        console.error('Error updating last_read_at:', error)
+      } else {
+        console.log('Successfully updated last_read_at:', data)
+        console.log('Updated timestamp:', new Date().toISOString())
+      }
+    } catch (error) {
+      console.error('Error in updateLastReadTimestamp:', error)
+    }
+  }
+
+  // Add effect to update last_read_at when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      updateLastReadTimestamp()
+    }
+  }, [messages])
 
   return (
     <div className="flex h-full">
