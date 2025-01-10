@@ -13,10 +13,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
 })
 
 // Initialize Google Translate
+if (!process.env.GOOGLE_SERVICE_ACCOUNT) {
+  throw new Error('GOOGLE_SERVICE_ACCOUNT environment variable is not set');
+}
+
+const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT);
+
 const translate = new v2.Translate({
-  projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
-})
+  credentials: {
+    client_email: serviceAccount.client_email,
+    private_key: serviceAccount.private_key,
+  },
+  projectId: serviceAccount.project_id,
+});
 
 async function translateText(text: string, targetLanguage: string) {
   try {
