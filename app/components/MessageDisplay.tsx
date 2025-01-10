@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Trash2, X, Check, Waves, Download, FileIcon, Smile } from 'lucide-react';
+import { Edit2, Trash2, X, Check, Waves, Download, FileIcon, Smile, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getCurrentUser, getSupabase } from '../auth';
 import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
+import { EMOJI_PAGES } from '../config/emojis';
 import UserDisplay from './UserDisplay';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -70,9 +71,6 @@ interface MessageDisplayProps {
   created_at: string;
 }
 
-// Common emojis that will be available in the picker
-const COMMON_EMOJIS = ['👍', '❤️', '😂', '🎉', '🚀', '👀', '💯', '✨'];
-
 export default function MessageDisplay({
   id,
   content,
@@ -100,6 +98,7 @@ export default function MessageDisplay({
     return themes[0];
   });
   const [reactions, setReactions] = useState<EmojiReaction[]>([]);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -185,13 +184,11 @@ export default function MessageDisplay({
       return;
     }
 
-    if (data) {
-      setReactions([...reactions, data[0]]);
-      toast({
-        title: "Reaction added",
-        description: "Your reaction has been added to the message."
-      });
-    }
+    // Remove optimistic update since we'll get the update via subscription
+    toast({
+      title: "Reaction added",
+      description: "Your reaction has been added to the message."
+    });
   };
 
   const handleRemoveReaction = async (reactionId: string) => {
@@ -213,7 +210,7 @@ export default function MessageDisplay({
       return;
     }
 
-    setReactions(reactions.filter(r => r.id !== reactionId));
+    // Remove optimistic update since we'll get the update via subscription
     toast({
       title: "Reaction removed",
       description: "Your reaction has been removed from the message."
@@ -394,27 +391,43 @@ export default function MessageDisplay({
 
   useEffect(() => {
     const supabase = getSupabase();
+    
+    // Create the filter condition based on message type
+    let filterCondition = '';
+    if (messageType === 'post') {
+      filterCondition = `post_id=eq.${id}`;
+    } else if (messageType === 'post_thread') {
+      filterCondition = `post_thread_comment_id=eq.${id}`;
+    } else if (messageType === 'dm') {
+      filterCondition = `message_id=eq.${id}`;
+    } else if (messageType === 'dm_thread') {
+      filterCondition = `conversation_thread_id=eq.${id}`;
+    }
+
     const channel = supabase
-      .channel('reactions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'emoji_reactions' }, (payload: any) => {
-        if (payload.eventType === 'INSERT') {
-          const newReaction: EmojiReaction = {
-            id: payload.new.id,
-            emoji: payload.new.emoji,
-            user_id: payload.new.user_id,
-            created_at: payload.new.created_at
-          };
-          setReactions(prev => [...prev, newReaction]);
-        } else if (payload.eventType === 'DELETE') {
-          setReactions(prev => prev.filter(r => r.id !== payload.old?.id));
+      .channel(`reactions:${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'emoji_reactions',
+          filter: filterCondition
+        },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT') {
+            setReactions(prev => [...prev, payload.new]);
+          } else if (payload.eventType === 'DELETE') {
+            setReactions(prev => prev.filter(r => r.id !== payload.old.id));
+          }
         }
-      })
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [id, messageType]);
 
   // Add separate subscription for translations
   useEffect(() => {
@@ -612,8 +625,9 @@ export default function MessageDisplay({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2">
-                  <div className="flex gap-1 flex-wrap max-w-[200px]">
-                    {COMMON_EMOJIS.map((emoji) => (
+                  {/* Emoji Grid */}
+                  <div className="grid grid-cols-10 gap-1 mb-2">
+                    {EMOJI_PAGES[currentPage].map((emoji) => (
                       <Button
                         key={emoji}
                         size="sm"
@@ -624,6 +638,28 @@ export default function MessageDisplay({
                         {emoji}
                       </Button>
                     ))}
+                  </div>
+                  {/* Pagination Controls */}
+                  <div className="flex justify-between items-center border-t pt-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : EMOJI_PAGES.length - 1))}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-gray-500">
+                      Page {currentPage + 1} of {EMOJI_PAGES.length}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setCurrentPage((prev) => (prev < EMOJI_PAGES.length - 1 ? prev + 1 : 0))}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </PopoverContent>
               </Popover>
