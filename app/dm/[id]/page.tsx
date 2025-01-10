@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { getCurrentUser, getSupabase } from '../../auth'
+import { getSupabase } from '../../auth'
+import { useUser } from '../../hooks/useUser'
 import { usePresence } from '../../hooks/usePresence'
 import {
   Tooltip,
@@ -89,7 +90,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [participants, setParticipants] = useState<Participant[]>([])
   const [newMessage, setNewMessage] = useState('')
   const { onlineUsers } = usePresence()
-  const [user, setUser] = useState<User | null>(null)
+  const { user } = useUser()
   const [activeThread, setActiveThread] = useState<{
     messageId: string;
     content: string;
@@ -230,24 +231,6 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
       channel.unsubscribe();
     };
   }, [params.id, messages]);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = getSupabase()
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (authUser) {
-        // Fetch additional user data
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, email, display_name, native_language')
-          .eq('id', authUser.id)
-          .single()
-        
-        setUser(userData)
-      }
-    }
-    fetchUser()
-  }, [])
 
   const fetchConversationAndParticipants = async () => {
     const supabase = getSupabase()
@@ -409,25 +392,23 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
     try {
-      const user = await getCurrentUser()
       if (!user) throw new Error('User not authenticated')
-      const supabase = getSupabase()
 
       // First, upload any files
-      const filePromises = selectedFiles.map(async (file: File) => {
+      const filePromises = selectedFiles.map(async (file) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `${user.id}/${fileName}`
 
         // Upload file to storage
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await getSupabase().storage
           .from('file-uploads')
           .upload(filePath, file)
 
         if (uploadError) throw uploadError
 
         // Create file record
-        const { data: fileData, error: fileRecordError } = await supabase
+        const { data: fileData, error: fileRecordError } = await getSupabase()
           .from('files')
           .insert({
             file_name: file.name,
@@ -442,77 +423,39 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
 
         if (fileRecordError) throw fileRecordError
 
-        return fileData as FileUpload
+        return fileData
       })
 
       const uploadedFiles = await Promise.all(filePromises)
 
       // Create message
-      const { data: messageData, error: messageError } = await supabase
-        .from('messages')
-        .insert({
+      const response = await fetch('/api/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          conversationId: params.id,
           content: newMessage.trim(),
-          conversation_id: params.id,
-          sender_id: user.id
-        })
-        .select()
-        .single()
+          fileIds: uploadedFiles.map(file => file.id)
+        }),
+      })
 
-      if (messageError) throw messageError
-
-      // Create file attachments
-      if (uploadedFiles.length > 0) {
-        const { error: attachmentError } = await supabase
-          .from('file_attachments')
-          .insert(
-            uploadedFiles.map(file => ({
-              file_id: file.id,
-              message_id: messageData.id
-            }))
-          )
-
-        if (attachmentError) throw attachmentError
+      if (!response.ok) {
+        throw new Error('Failed to send message')
       }
 
-      // Clear input and show success immediately
       setNewMessage('')
       setSelectedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
-      
-      toast({
-        title: "Message sent",
-        description: "Your message has been sent successfully."
-      })
-
-      // Trigger translation in the background
-      const triggerTranslation = async () => {
-        try {
-          await fetch('/api/translations', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              messageId: messageData.id,
-              senderId: user.id
-            }),
-          })
-        } catch (translationError) {
-          console.error('Translation error:', translationError)
-        }
-      }
-      
-      // Don't await the translation
-      triggerTranslation()
-
     } catch (error) {
       console.error('Error sending message:', error)
       toast({
+        title: "Error",
+        description: "Failed to send message",
         variant: "destructive",
-        title: "Error sending message",
-        description: "There was an error sending your message. Please try again."
       })
     }
   }

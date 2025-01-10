@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { getSupabase, getCurrentUser } from '../../auth'
+import { getSupabase } from '../../auth'
+import { useUser } from '../../hooks/useUser'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { LogOut, Paperclip, X } from 'lucide-react'
@@ -20,6 +21,7 @@ export default function Channel() {
   const { channelId } = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user: currentUser } = useUser()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -276,14 +278,13 @@ export default function Channel() {
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
     try {
-      const user = await getCurrentUser()
-      if (!user) throw new Error('User not authenticated')
+      if (!currentUser) throw new Error('User not authenticated')
 
       // First, upload any files
       const filePromises = selectedFiles.map(async (file) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-        const filePath = `${user.id}/${fileName}`
+        const filePath = `${currentUser.id}/${fileName}`
 
         // Upload file to storage
         const { error: uploadError } = await getSupabase().storage
@@ -301,7 +302,7 @@ export default function Channel() {
             file_size: file.size,
             bucket: 'file-uploads',
             path: filePath,
-            uploaded_by: user.id
+            uploaded_by: currentUser.id
           })
           .select()
           .single()
@@ -321,8 +322,9 @@ export default function Channel() {
         },
         body: JSON.stringify({
           channelId,
-          userId: user.id,
-          content: newMessage.trim()
+          userId: currentUser.id,
+          content: newMessage.trim(),
+          fileIds: uploadedFiles.map(file => file.id)
         }),
       })
 
@@ -330,41 +332,17 @@ export default function Channel() {
         throw new Error('Failed to send message')
       }
 
-      const postData = await response.json()
-
-      // Create file attachments
-      if (uploadedFiles.length > 0) {
-        const { error: attachmentError } = await getSupabase()
-          .from('file_attachments')
-          .insert(
-            uploadedFiles.map(file => ({
-              file_id: file.id,
-              post_id: postData.id,
-              message_id: null,
-              conversation_thread_comment_id: null
-            }))
-          )
-
-        if (attachmentError) throw attachmentError
-      }
-
       setNewMessage('')
       setSelectedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
-
-      toast({
-        title: "Message sent",
-        description: "Your message has been sent successfully."
-      })
     } catch (error) {
       console.error('Error sending message:', error)
-      setError('Failed to send message')
       toast({
+        title: "Error",
+        description: "Failed to send message",
         variant: "destructive",
-        title: "Error sending message",
-        description: "There was an error sending your message. Please try again."
       })
     }
   }
@@ -392,21 +370,25 @@ export default function Channel() {
 
   const handleLeaveChannel = async () => {
     try {
-      const user = await getCurrentUser()
-      if (!user) throw new Error('User not authenticated')
+      if (!currentUser) throw new Error('User not authenticated')
 
       const supabase = getSupabase()
       const { error } = await supabase
         .from('channel_members')
         .delete()
         .eq('channel_id', channelId)
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
 
       if (error) throw error
-      router.push('/') // Redirect to home page after leaving
+
+      router.push('/')
     } catch (error) {
       console.error('Error leaving channel:', error)
-      setError('Failed to leave channel')
+      toast({
+        title: "Error",
+        description: "Failed to leave channel",
+        variant: "destructive",
+      })
     }
   }
 

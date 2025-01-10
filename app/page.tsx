@@ -2,15 +2,16 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { getCurrentUser, supabase } from './auth';
+import { supabase } from './auth';
+import { useUser } from './hooks/useUser';
 import { toast } from 'react-hot-toast';
 
 export default function Home() {
   const router = useRouter();
+  const { user } = useUser();
 
   useEffect(() => {
     const checkAndRedirect = async () => {
-      const user = await getCurrentUser();
       if (!user) {
         // Handle unauthenticated state if needed
         return;
@@ -43,7 +44,7 @@ export default function Home() {
     };
 
     checkAndRedirect();
-  }, [router]);
+  }, [router, user]);
 
   return null;
 }

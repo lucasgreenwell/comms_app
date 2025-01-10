@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCurrentUser, getSupabase } from '../auth'
+import { getSupabase } from '../auth'
+import { useUser } from '../hooks/useUser'
 import { Button } from '@/components/ui/button'
 import { themes, Theme } from '../config/themes'
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -28,6 +29,7 @@ interface Language {
 
 export default function ProfilePage() {
   const [user, setUser] = useState<ExtendedUser | null>(null)
+  const { user: currentUser } = useUser()
   const [selectedTheme, setSelectedTheme] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem(THEME_STORAGE_KEY) || 'slate'
@@ -67,7 +69,6 @@ export default function ProfilePage() {
 
   const fetchUser = async () => {
     try {
-      const currentUser = await getCurrentUser()
       if (!currentUser) return;
 
       const supabase = getSupabase()

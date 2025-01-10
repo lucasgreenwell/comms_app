@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { getCurrentUser, getSupabase } from '../../auth'
+import { getSupabase } from '../../auth'
+import { useUser } from '../../hooks/useUser'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import { X, Paperclip } from 'lucide-react'
 import ThreadCommentItem from './ThreadCommentItem'
@@ -72,17 +73,13 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
   const { onlineUsers } = usePresence()
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const { user: currentUser } = useUser()
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
     }
     return themes[0]
   })
-
-  useEffect(() => {
-    getCurrentUser().then(user => setCurrentUser(user))
-  }, [])
 
   useEffect(() => {
     const handleStorageChange = () => {
@@ -203,14 +200,13 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
     if (!newComment.trim() && selectedFiles.length === 0) return
 
     try {
-      const user = await getCurrentUser()
-      if (!user) throw new Error('User not authenticated')
+      if (!currentUser) throw new Error('User not authenticated')
 
       // First, upload any files
       const filePromises = selectedFiles.map(async (file) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-        const filePath = `${user.id}/${fileName}`
+        const filePath = `${currentUser.id}/${fileName}`
 
         // Upload file to storage
         const { error: uploadError } = await getSupabase().storage
@@ -228,7 +224,7 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
             file_size: file.size,
             bucket: 'file-uploads',
             path: filePath,
-            uploaded_by: user.id
+            uploaded_by: currentUser.id
           })
           .select()
           .single()
@@ -248,7 +244,7 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
         },
         body: JSON.stringify({
           postId,
-          userId: user.id,
+          userId: currentUser.id,
           content: newComment.trim()
         }),
       })

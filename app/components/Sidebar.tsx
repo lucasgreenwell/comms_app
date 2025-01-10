@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { getSupabase, getCurrentUser } from '../auth'
+import { getSupabase } from '../auth'
+import { useUser } from '../hooks/useUser'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -60,7 +61,7 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Post[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const { user: currentUser } = useUser()
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       return themes.find(t => t.id === localStorage.getItem('slack-clone-theme')) || themes[0]
@@ -78,7 +79,6 @@ export default function Sidebar() {
 
   useEffect(() => {
     fetchChannels()
-    fetchCurrentUser()
     fetchDirectMessages()
     fetchUnreadCounts()
     const supabase = getSupabase()
@@ -152,20 +152,13 @@ export default function Sidebar() {
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
 
-  const fetchCurrentUser = async () => {
-    const user = await getCurrentUser()
-    setCurrentUser(user)
-  }
-
-
   const fetchChannels = async () => {
     setLoadingChannels(true)
     setError(null)
     try {
+      if (!currentUser) throw new Error('No user found')
+
       const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) throw new Error('No user found')
 
       // Fetch all channels
       const { data: allChannelsData, error: allChannelsError } = await supabase
@@ -179,7 +172,7 @@ export default function Sidebar() {
       const { data: memberships, error: membershipError } = await supabase
         .from('channel_members')
         .select('channel_id')
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
 
       if (membershipError) throw membershipError
 
@@ -204,10 +197,9 @@ export default function Sidebar() {
     if (!newChannelName.trim()) return
 
     try {
+      if (!currentUser) throw new Error('No user found')
+
       const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) throw new Error('No user found')
 
       // Create the channel
       const { data: channelData, error: channelError } = await supabase
@@ -221,7 +213,7 @@ export default function Sidebar() {
       // Add the creator as a member
       const { error: memberError } = await supabase
         .from('channel_members')
-        .insert({ channel_id: channelData.id, user_id: user.id })
+        .insert({ channel_id: channelData.id, user_id: currentUser.id })
 
       if (memberError) throw memberError
 
@@ -243,16 +235,15 @@ export default function Sidebar() {
 
   const handleJoinChannel = async (channelId: string) => {
     try {
+      if (!currentUser) throw new Error('No user found')
+
       const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) throw new Error('No user found')
 
-      const { error } = await supabase
+      const { error: memberError } = await supabase
         .from('channel_members')
-        .insert({ channel_id: channelId, user_id: user.id })
+        .insert({ channel_id: channelId, user_id: currentUser.id })
 
-      if (error) throw error
+      if (memberError) throw memberError
 
       await fetchChannels()
       router.push(`/channel/${channelId}`)

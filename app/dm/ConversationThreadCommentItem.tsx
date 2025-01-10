@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCurrentUser } from '../auth'
+import { useUser } from '../hooks/useUser'
 import MessageDisplay from '../components/MessageDisplay'
 import { usePresence } from '../hooks/usePresence'
 
@@ -30,12 +30,8 @@ interface ConversationThreadCommentItemProps {
 }
 
 export default function ConversationThreadCommentItem({ comment, onCommentUpdate }: ConversationThreadCommentItemProps) {
-  const [currentUser, setCurrentUser] = useState<any>(null)
+  const { user: currentUser } = useUser()
   const { onlineUsers } = usePresence()
-
-  useEffect(() => {
-    getCurrentUser().then(user => setCurrentUser(user))
-  }, [])
 
   return (
     <MessageDisplay
