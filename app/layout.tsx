@@ -24,6 +24,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       
       // Handle auth state changes
       if (session) {
+        const tourStage = localStorage.getItem('tour_stage')
+        if (!tourStage && !pathname?.startsWith('/channel/ba3a0cd2-ed05-4f8b-9586-3c1dda9d6338')) {
+          localStorage.setItem('tour_stage', '1')
+          router.replace('/channel/ba3a0cd2-ed05-4f8b-9586-3c1dda9d6338?tourStep=1')
+          return
+        }
+
         if (pathname === '/login' || pathname === '/signup') {
           router.replace('/')
         }

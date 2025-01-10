@@ -18,9 +18,12 @@ interface User {
 interface StartChatModalProps {
   isOpen: boolean
   onClose: () => void
+  preselectedUserId?: string
+  customHeader?: string
+  showStartChatAnimation?: boolean
 }
 
-export default function StartChatModal({ isOpen, onClose }: StartChatModalProps) {
+export default function StartChatModal({ isOpen, onClose, preselectedUserId, customHeader, showStartChatAnimation }: StartChatModalProps) {
   const [users, setUsers] = useState<User[]>([])
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -53,6 +56,21 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
     }
   }, [isOpen, onClose])
 
+  useEffect(() => {
+    if (preselectedUserId) {
+      const user = users.find(u => u.id === preselectedUserId)
+      if (user) {
+        setSelectedUsers([user])
+      }
+    }
+  }, [preselectedUserId, users])
+
+  useEffect(() => {
+    if (customHeader && preselectedUserId) {
+      setUsers(prevUsers => prevUsers.filter(u => u.id === preselectedUserId))
+    }
+  }, [customHeader, preselectedUserId])
+
   const fetchUsers = async () => {
     const supabase = getSupabase()
     const { data: { user: currentUser } } = await supabase.auth.getUser()
@@ -84,10 +102,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
     }
 
     try {
-      // Sort and deduplicate participant IDs to ensure consistency
       const allParticipantIds = Array.from(new Set([...selectedUsers.map(u => u.id), currentUser.id])).sort()
-      
-      // First, check if a conversation with these exact participants exists
       const { data: existingConversation, error: lookupError } = await supabase
         .rpc('find_existing_conversation', {
           participant_ids: allParticipantIds
@@ -102,7 +117,6 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
         return
       }
 
-      // If no existing conversation, create a new one within a transaction
       const { data: conversation, error: convError } = await supabase
         .from('conversations')
         .insert({
@@ -114,7 +128,6 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
       if (convError) throw convError
 
-      // Create participant entries
       const participants = allParticipantIds.map(userId => ({
         conversation_id: conversation.id,
         user_id: userId
@@ -126,7 +139,6 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
 
       if (partError) throw partError
 
-      // Double-check that we didn't create a duplicate during the process
       const { data: finalCheck } = await supabase
         .rpc('find_existing_conversation', {
           participant_ids: allParticipantIds
@@ -155,7 +167,7 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className={`${theme.colors.background} ${theme.colors.foreground} rounded-lg p-6 w-96`}>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Start a New Chat</h2>
+          <h2 className="text-xl font-bold">{customHeader || "Start a New Chat"}</h2>
           <button 
             onClick={onClose} 
             className={`${theme.colors.accent} hover:bg-opacity-80 p-1 rounded`}
@@ -214,7 +226,9 @@ export default function StartChatModal({ isOpen, onClose }: StartChatModalProps)
         <button
           onClick={handleStartChat}
           disabled={selectedUsers.length === 0 || isLoading}
-          className={`w-full ${theme.colors.accent} p-2 rounded disabled:opacity-50 hover:bg-opacity-80`}
+          className={`w-full ${theme.colors.accent} p-2 rounded disabled:opacity-50 hover:bg-opacity-80 ${
+            showStartChatAnimation ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+          } transition-all duration-300`}
         >
           {isLoading ? 'Creating...' : 'Start Chat'}
         </button>

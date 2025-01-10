@@ -59,6 +59,7 @@ export default function Channel() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const tourStep = Number(searchParams.get('tourStep')) || 0
 
   useEffect(() => {
     fetchChannel()
@@ -502,17 +503,29 @@ export default function Channel() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
-              className="flex-1"
+              className={`flex-1 ${
+                tourStep === 2 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+              } transition-all duration-300`}
             />
             <Button 
               type="button"
               variant="outline"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
+              className={`${
+                tourStep === 2 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+              } transition-all duration-300`}
             >
               <Paperclip className="h-4 w-4" />
             </Button>
-            <Button type="submit">Send</Button>
+            <Button 
+              type="submit"
+              className={`${
+                tourStep === 2 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+              } transition-all duration-300`}
+            >
+              Send
+            </Button>
           </div>
           <input
             type="file"

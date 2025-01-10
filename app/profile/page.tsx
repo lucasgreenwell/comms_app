@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { getSupabase } from '../auth'
 import { useUser } from '../hooks/useUser'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,8 @@ export default function ProfilePage() {
   const [languages, setLanguages] = useState<Language[]>([])
   const [selectedLanguage, setSelectedLanguage] = useState<string>('')
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const tourStep = parseInt(searchParams.get('tourStep') || '0')
 
   useEffect(() => {
     fetchUser()
@@ -262,7 +264,9 @@ export default function ProfilePage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={user?.display_name || "Enter display name"}
-                className="flex-1"
+                className={`${
+                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+                } transition-all duration-300`}
               />
               <Button type="submit" size="sm">
                 Update Name
@@ -270,11 +274,13 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="mb-4">
-            <Label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
-              Preferred Language
-            </Label>
+            <Label htmlFor="language">Preferred Language</Label>
             <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger 
+                className={`w-full ${
+                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+                } transition-all duration-300`}
+              >
                 <SelectValue placeholder={languages.find(lang => lang.id === user?.native_language)?.language || "Select a language"} />
               </SelectTrigger>
               <SelectContent>

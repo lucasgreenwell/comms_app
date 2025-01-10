@@ -15,10 +15,3 @@ export function getSupabase() {
   }
   return supabase
 }
-
-export async function getCurrentUser() {
-  const supabase = getSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
-}
-

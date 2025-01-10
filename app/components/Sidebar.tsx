@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { getSupabase } from '../auth'
 import { useUser } from '../hooks/useUser'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ import StartChatModal from './StartChatModal'
 import { usePresence } from '../hooks/usePresence'
 import SearchModal from './SearchModal'
 import UserDisplay from './UserDisplay'
+import { TourPopup } from './TourPopup'
 
 interface Channel {
   id: string
@@ -69,6 +70,7 @@ export default function Sidebar() {
     return themes[0]
   })
   const router = useRouter()
+  const pathname = usePathname()
   const [showAllChannels, setShowAllChannels] = useState(false)
   const [allChannels, setAllChannels] = useState<Channel[]>([])
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([])
@@ -76,6 +78,9 @@ export default function Sidebar() {
   const { onlineUsers } = usePresence()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  const [showTour, setShowTour] = useState(false)
+  const [tourStep, setTourStep] = useState(1)
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
 
   useEffect(() => {
     fetchChannels()
@@ -151,6 +156,78 @@ export default function Sidebar() {
     window.addEventListener('storage', handleStorageChange)
     return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
+
+  useEffect(() => {
+    // Check if user needs tour
+    const didTour = localStorage.getItem('did_tour')
+    const tourStage = localStorage.getItem('tour_stage')
+    if (!didTour) {
+      setShowTour(true)
+      if (tourStage) {
+        setTourStep(Number(tourStage))
+      }
+    }
+  }, [])
+
+  const handleCloseTour = () => {
+    setShowTour(false)
+    setTourStep(6)
+    localStorage.setItem('did_tour', 'true')
+    localStorage.setItem('tour_stage', '6')
+  }
+
+  const handleNextTourStep = () => {
+    const nextStep = tourStep + 1
+    setTourStep(nextStep)
+    localStorage.setItem('tour_stage', nextStep.toString())
+    
+    if (tourStep === 3) {
+      router.push(`/profile?tourStep=4`)
+    } else if (tourStep === 4) {
+      setIsChatModalOpen(true)
+    } else if (pathname?.startsWith('/channel/')) {
+      // Update URL while keeping the same channel
+      const channelId = pathname.split('/')[2]
+      router.push(`/channel/${channelId}?tourStep=${nextStep}`)
+    }
+  }
+
+  const getTourContent = () => {
+    switch (tourStep) {
+      case 1:
+        return {
+          title: "Welcome to Channels! 👋",
+          content: "Channels are spaces where you can chat with your team about specific topics. You can join existing channels or create new ones. Messages in channels are visible to all channel members, making it perfect for team discussions and announcements. You can click the create channel button to create a new channel.",
+          position: 'top-center' as const
+        }
+      case 2:
+        return {
+          title: "Send Messages & Files 📝",
+          content: "Type your message in the input box below and hit send or press Enter. Need to share files? Click the paperclip icon to attach images, documents, or any other files to your message.",
+          position: 'center-right' as const
+        }
+      case 3:
+        return {
+          title: "Search Everything 🔍",
+          content: "Need to find something? Use the search feature to quickly locate messages, files, and conversations across all your channels and direct messages. It's a powerful way to find exactly what you're looking for.",
+          position: 'top-center' as const
+        }
+      case 4:
+        return {
+          title: "Customize Your Profile 👤",
+          content: "Let's set up your profile! You can come back to this page to change your display name and preferred language after the tour. We provide live translation for all supported languages, including Mandarin Chinese, Spanish, English, Hindi, Arabic, Bengali, Portuguese, Russian, Japanese, and Western Punjabi.",
+          position: 'top-left' as const
+        }
+      case 5:
+        return {
+          title: "Direct Messages 💬",
+          content: "Let's start a conversation with the admin. Click 'Next' to open the chat window.",
+          position: 'top-right' as const
+        }
+      default:
+        return null
+    }
+  }
 
   const fetchChannels = async () => {
     setLoadingChannels(true)
@@ -353,7 +430,12 @@ export default function Sidebar() {
     <aside className={`min-w-[15vw] ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Channels</h2>
-        <Button onClick={() => setIsSearchOpen(true)} variant="ghost" size="icon">
+        <Button 
+          onClick={() => setIsSearchOpen(true)} 
+          variant="ghost" 
+          size="icon"
+          className={`${tourStep === 3 ? 'scale-150 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''} transition-all duration-300`}
+        >
           <Search className="h-5 w-5" />
         </Button>
       </div>
@@ -365,7 +447,7 @@ export default function Sidebar() {
           channels.map((channel) => (
             <li key={channel.id} className="mb-2">
               <Link 
-                href={`/channel/${channel.id}`} 
+                href={`/channel/${channel.id}?tourStep=${tourStep}`} 
                 className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
               >
                 <span className="text-sm"># {channel.name}</span>
@@ -406,7 +488,14 @@ export default function Sidebar() {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80">+ Create Channel</Button>
+            <Button 
+              variant="ghost" 
+              className={`w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80 ${
+                tourStep === 1 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+              } transition-all duration-300`}
+            >
+              + Create Channel
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -496,6 +585,24 @@ export default function Sidebar() {
         <LogOut className="mr-2 h-4 w-4" />
         Logout
       </Button>
+
+      {showTour && getTourContent() && tourStep !== 5 && (
+        <TourPopup
+          {...getTourContent()!}
+          onClose={handleCloseTour}
+          onNext={handleNextTourStep}
+          isLastStep={tourStep === 5}
+          currentStep={tourStep}
+          totalSteps={5}
+        />
+      )}
+      <StartChatModal
+        isOpen={isChatModalOpen}
+        onClose={() => setIsChatModalOpen(false)}
+        preselectedUserId="dda6f6bb-c6b1-4d8f-b0f7-5dd506e7b4f8"
+        customHeader={tourStep === 5 ? "Start a chat to finish the tour!" : undefined}
+        showStartChatAnimation={tourStep === 5}
+      />
     </aside>
   )
 }
