@@ -473,14 +473,23 @@ export default function Sidebar() {
               .map((channel) => (
                 <li key={channel.id} className="flex items-center px-2 h-8">
                   <span className="flex-1 text-sm"># {channel.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleJoinChannel(channel.id)}
-                    className="h-4 w-4 p-0"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleJoinChannel(channel.id)}
+                          className="h-4 w-4 p-0"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Join this channel</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </li>
               ))}
           </ul>
