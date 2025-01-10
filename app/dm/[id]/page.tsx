@@ -568,35 +568,37 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   return (
     <div className="flex h-full">
       <div className={`flex-1 flex flex-col h-full ${activeThread ? 'max-w-[calc(100%-400px)]' : ''}`}>
-        <h1 className="text-2xl font-bold mb-4 p-4">
-          {conversation?.type === 'dm' ? (
-            <div className="flex items-center">
-              Chat with{' '}
-              {participants[0] && (
-                <UserDisplay 
-                  user={participants[0]}
-                  isOnline={onlineUsers.has(participants[0].id)}
-                  className="ml-2"
-                />
-              )}
-            </div>
-          ) : (
-            <div>
-              <div>{conversation?.name || 'Group Chat'}</div>
-              <div className="text-sm font-normal text-gray-500 flex flex-wrap gap-2">
-                {participants.map((p, i) => (
-                  <span key={p.id}>
-                    <UserDisplay 
-                      user={p}
-                      isOnline={onlineUsers.has(p.id)}
-                    />
-                    {i < participants.length - 1 ? ',' : ''}
-                  </span>
-                ))}
+        {conversation && (
+          <h1 className="text-2xl font-bold mb-4 p-4">
+            {conversation.type === 'dm' ? (
+              <div className="flex items-center">
+                Chat with{' '}
+                {participants[0] && (
+                  <UserDisplay 
+                    user={participants[0]}
+                    isOnline={onlineUsers.has(participants[0].id)}
+                    className="ml-2"
+                  />
+                )}
               </div>
-            </div>
-          )}
-        </h1>
+            ) : (
+              <div>
+                <div>{conversation.name || 'Group Chat'}</div>
+                <div className="text-sm font-normal text-gray-500 flex flex-wrap gap-2">
+                  {participants.map((p, i) => (
+                    <span key={p.id}>
+                      <UserDisplay 
+                        user={p}
+                        isOnline={onlineUsers.has(p.id)}
+                      />
+                      {i < participants.length - 1 ? ',' : ''}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </h1>
+        )}
         <div className="flex-1 overflow-y-auto">
           <div>
             {messages.map((message) => (

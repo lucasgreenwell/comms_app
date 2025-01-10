@@ -2,8 +2,5 @@
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
   "/login/page": "app/login/page.js",
   "/profile/page": "app/profile/page.js",
-  "/dm/[id]/page": "app/dm/[id]/page.js",
-  "/api/translations/route": "app/api/translations/route.js",
-  "/page": "app/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/dm/[id]/page": "app/dm/[id]/page.js"
 }
