@@ -472,23 +472,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         if (attachmentError) throw attachmentError
       }
 
-      // Trigger translation
-      try {
-        await fetch('/api/translations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messageId: messageData.id,
-            senderId: user.id
-          }),
-        })
-      } catch (translationError) {
-        console.error('Translation error:', translationError)
-        // Don't throw here - we still want to show the message even if translation fails
-      }
-
+      // Clear input and show success immediately
       setNewMessage('')
       setSelectedFiles([])
       if (fileInputRef.current) {
@@ -499,6 +483,28 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         title: "Message sent",
         description: "Your message has been sent successfully."
       })
+
+      // Trigger translation in the background
+      const triggerTranslation = async () => {
+        try {
+          await fetch('/api/translations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageId: messageData.id,
+              senderId: user.id
+            }),
+          })
+        } catch (translationError) {
+          console.error('Translation error:', translationError)
+        }
+      }
+      
+      // Don't await the translation
+      triggerTranslation()
+
     } catch (error) {
       console.error('Error sending message:', error)
       toast({
