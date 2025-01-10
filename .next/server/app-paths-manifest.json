@@ -1,4 +1,5 @@
 {
-  "/api/translations/route": "app/api/translations/route.js",
-  "/dm/[id]/page": "app/dm/[id]/page.js"
+  "/dm/[id]/page": "app/dm/[id]/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/api/translations/route": "app/api/translations/route.js"
 }

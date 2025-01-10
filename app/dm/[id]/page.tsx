@@ -339,7 +339,8 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         sender:sender_id(
           id,
           email,
-          display_name
+          display_name,
+          native_language
         ),
         files:file_attachments(
           id,

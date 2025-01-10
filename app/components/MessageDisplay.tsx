@@ -460,20 +460,20 @@ export default function MessageDisplay({
   }, [id, messageType, content, onUpdate]);
 
   const getTranslatedContent = () => {
-    if (!translation || !currentUser?.native_language) return null;
+    if (!translation || !currentUser?.native_language || user.native_language === currentUser.native_language) return null;
 
-// Map language UUID to translation field
+    // Map language UUID to translation field
     const translationMap: Record<string, keyof Translation> = {
-        '3823c9fa-ed84-4a19-906a-7e5639a9e3d8': 'portuguese_translation',    // Portuguese
-        '6292a2b1-7d7c-4223-958a-c4a0bbc0f8a3': 'bengali_translation',       // Bengali
-        '6483ffa6-c90c-43ea-b97e-e33a81c80262': 'russian_translation',       // Russian
-        '7e2490ff-ef43-47eb-9de7-59963b9b4f9c': 'hindi_translation',         // Hindi
-        '9b15d05b-c7ff-4ed6-99f9-13f19241d150': 'japanese_translation',      // Japanese
-        'a5a8f2e7-4046-4ea9-823f-2f549ce1880e': 'arabic_translation',        // Arabic
-        'a948dd0e-20de-4e99-8450-72aa52331ba3': 'english_translation',       // English
-        'b6e44df4-60ed-4064-9f55-9e5c0b4dddc4': 'western_punjabi_translation',// Western Punjabi
-        'baebecad-9aae-42c4-b595-44f2727a71be': 'mandarin_chinese_translation', // Mandarin Chinese
-        'f8465dcb-806e-470c-9f9b-9159e14f6903': 'spanish_translation',       // Spanish
+      '3823c9fa-ed84-4a19-906a-7e5639a9e3d8': 'portuguese_translation',    // Portuguese
+      '6292a2b1-7d7c-4223-958a-c4a0bbc0f8a3': 'bengali_translation',       // Bengali
+      '6483ffa6-c90c-43ea-b97e-e33a81c80262': 'russian_translation',       // Russian
+      '7e2490ff-ef43-47eb-9de7-59963b9b4f9c': 'hindi_translation',         // Hindi
+      '9b15d05b-c7ff-4ed6-99f9-13f19241d150': 'japanese_translation',      // Japanese
+      'a5a8f2e7-4046-4ea9-823f-2f549ce1880e': 'arabic_translation',        // Arabic
+      'a948dd0e-20de-4e99-8450-72aa52331ba3': 'english_translation',       // English
+      'b6e44df4-60ed-4064-9f55-9e5c0b4dddc4': 'western_punjabi_translation',// Western Punjabi
+      'baebecad-9aae-42c4-b595-44f2727a71be': 'mandarin_chinese_translation', // Mandarin Chinese
+      'f8465dcb-806e-470c-9f9b-9159e14f6903': 'spanish_translation',       // Spanish
     };
   
 
@@ -513,6 +513,7 @@ export default function MessageDisplay({
   }
 
   const isCurrentUser = currentUser?.id === user.id;
+  console.log(user.native_language, currentUser?.native_language);
 
   return (
     <div
