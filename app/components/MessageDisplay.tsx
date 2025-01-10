@@ -470,7 +470,7 @@ export default function MessageDisplay({
       '6292a2b1-7d7c-4223-958a-c4a0bbc0f8a3': 'bengali_translation',       // Bengali
       '6483ffa6-c90c-43ea-b97e-e33a81c80262': 'russian_translation',       // Russian
       '7e2490ff-ef43-47eb-9de7-59963b9b4f9c': 'hindi_translation',         // Hindi
-      '9b15d05b-c7ff-4ed6-99f9-13f19241d150': 'japanese_translation',      // Japanese
+      '9b15d05b-c7ff-4ed6-99f9-32f169241d50': 'japanese_translation',      // Japanese
       'a5a8f2e7-4046-4ea9-823f-2f549ce1880e': 'arabic_translation',        // Arabic
       'a948dd0e-20de-4e99-8450-72aa52331ba3': 'english_translation',       // English
       'b6e44df4-60ed-4064-9f55-9e5c0b4dddc4': 'western_punjabi_translation',// Western Punjabi
