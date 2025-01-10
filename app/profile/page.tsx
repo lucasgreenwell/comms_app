@@ -67,25 +67,39 @@ export default function ProfilePage() {
 
   const fetchUser = async () => {
     try {
-      const currentUser = await getCurrentUser() as ExtendedUser
-      setUser(currentUser)
-      setDisplayName(currentUser?.display_name || '')
-      setSelectedLanguage(currentUser?.native_language || '')
+      const currentUser = await getCurrentUser()
+      if (!currentUser) return;
+
+      const supabase = getSupabase()
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single()
+
+      if (userError) throw userError
+
+      const extendedUser: ExtendedUser = {
+        ...currentUser,
+        display_name: userData.display_name,
+        native_language: userData.native_language
+      }
+
+      setUser(extendedUser)
+      setDisplayName(userData.display_name || '')
+      setSelectedLanguage(userData.native_language || '')
       
-      if (currentUser) {
-        try {
-          const supabase = getSupabase()
-          const { data } = await supabase
-            .from('user_profiles')
-            .select('profile_pic_url')
-            .eq('id', currentUser.id)
-            .maybeSingle()
-          
-          setProfilePicUrl(data?.profile_pic_url || null)
-        } catch (error) {
-          // Silently handle the error - profile pic not found is an expected case
-          setProfilePicUrl(null)
-        }
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('profile_pic_url')
+          .eq('id', currentUser.id)
+          .maybeSingle()
+        
+        setProfilePicUrl(data?.profile_pic_url || null)
+      } catch (error) {
+        // Silently handle the error - profile pic not found is an expected case
+        setProfilePicUrl(null)
       }
     } catch (error) {
       console.error('Error fetching user:', error)
@@ -238,23 +252,29 @@ export default function ProfilePage() {
         <h2 className="text-lg font-semibold mb-2">User Information</h2>
         <form onSubmit={handleDisplayNameChange}>
           <div className="mb-4">
-            <Label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+            <Label htmlFor="displayName" className="block text-sm font-medium text-gray-700 mb-2">
               Display Name
             </Label>
-            <Input
-              id="displayName"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="mt-1 block w-full"
-            />
+            <div className="flex gap-2">
+              <Input
+                id="displayName"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder={user?.display_name || "Enter display name"}
+                className="flex-1"
+              />
+              <Button type="submit" size="sm">
+                Update Name
+              </Button>
+            </div>
           </div>
           <div className="mb-4">
-            <Label htmlFor="language" className="block text-sm font-medium text-gray-700">
+            <Label htmlFor="language" className="block text-sm font-medium text-gray-700 mb-2">
               Preferred Language
             </Label>
             <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a language" />
+                <SelectValue placeholder={languages.find(lang => lang.id === user?.native_language)?.language || "Select a language"} />
               </SelectTrigger>
               <SelectContent>
                 {languages.map((lang) => (
@@ -265,7 +285,6 @@ export default function ProfilePage() {
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit">Update Display Name</Button>
         </form>
         <p className="text-gray-600 dark:text-gray-300 mt-4">
           Email: {user.email}
@@ -291,7 +310,8 @@ export default function ProfilePage() {
                 className={`
                   flex flex-col items-center justify-center rounded-lg border-2 border-muted
                   p-4 hover:bg-accent hover:text-accent-foreground
-                  peer-data-[state=checked]:border-primary
+                  peer-data-[state=checked]:border-primary peer-data-[state=checked]:scale-105
+                  peer-data-[state=checked]:shadow-lg peer-data-[state=checked]:border-4
                   ${theme.colors.background} ${theme.colors.foreground}
                   cursor-pointer transition-all
                 `}
