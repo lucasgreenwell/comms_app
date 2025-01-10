@@ -11,6 +11,7 @@ interface Message {
   content: string;
   conversation_id: string;
   user_id: string;
+  created_at: string;
   user: {
     id: string;
     display_name: string;
@@ -24,6 +25,7 @@ interface Post {
   channel_id?: string;
   post_id?: string;
   user_id: string;
+  created_at: string;
   user: {
     id: string;
     display_name: string;
@@ -36,6 +38,7 @@ interface ThreadComment {
   content: string;
   post_id: string;
   user_id: string;
+  created_at: string;
   posts: {
     channel_id: string;
   };
@@ -46,6 +49,7 @@ interface ConversationThreadComment {
   content: string;
   message_id: string;
   user_id: string;
+  created_at: string;
   messages: {
     conversation_id: string;
   };
@@ -87,7 +91,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
       const { data: posts, error: postError } = await supabase
         .from('posts')
-        .select('id, content, channel_id, user_id')
+        .select('id, content, channel_id, user_id, created_at')
         .ilike('content', `%${searchQuery}%`);
 
       if (postError) throw postError;
@@ -99,6 +103,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           content,
           post_id,
           user_id,
+          created_at,
           posts!inner (
             channel_id
           )
@@ -113,7 +118,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           id,
           content,
           conversation_id,
-          sender_id
+          sender_id,
+          created_at
         `)
         .in('conversation_id', conversationIds)
         .ilike('content', `%${searchQuery}%`);
@@ -127,6 +133,7 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           content,
           message_id,
           user_id,
+          created_at,
           messages!inner (
             conversation_id
           )
@@ -152,24 +159,28 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
 
       const postsWithUser = posts.map(post => ({
         ...post,
+        created_at: post.created_at || new Date().toISOString(),
         user: users.find(u => u.id === post.user_id) || { id: '', display_name: '' }
       }));
 
       const threadCommentsWithUser = (threadComments || []).map(comment => ({
         ...comment,
         channel_id: comment.posts.channel_id,
+        created_at: comment.created_at || new Date().toISOString(),
         user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
       }));
 
       const messagesWithUser = (messages || []).map(message => ({
         ...message,
         user_id: message.sender_id,
+        created_at: message.created_at || new Date().toISOString(),
         user: users.find(u => u.id === message.sender_id) || { id: '', display_name: '' }
       }));
 
       const conversationThreadCommentsWithUser = (conversationThreadComments || []).map(comment => ({
         ...comment,
         conversation_id: comment.messages.conversation_id,
+        created_at: comment.created_at || new Date().toISOString(),
         user: users.find(u => u.id === comment.user_id) || { id: '', display_name: '' }
       }));
 
@@ -272,8 +283,20 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
           <div
             key={item.id}
             onClick={() => handleResultClick(item)}
-            className="cursor-pointer flex justify-between items-center"
+            className="cursor-pointer relative mb-4 text-black"
           >
+            <div className="absolute top-2 right-2 flex gap-1 z-10">
+              {'conversation_id' in item && (
+                <div className="bg-white rounded-full p-1 shadow-sm">
+                  <MessageSquare className="h-4 w-4 text-gray-500" />
+                </div>
+              )}
+              {(item.post_id || 'message_id' in item) && (
+                <div className="bg-white rounded-full p-1 shadow-sm">
+                  <Waves className="h-4 w-4 text-gray-500" />
+                </div>
+              )}
+            </div>
             <MessageDisplay
               id={item.id}
               content={item.content}
@@ -284,15 +307,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
               tableName="posts"
               onThreadOpen={() => handleResultClick(item)}
               hideActions={true}
+              created_at={item.created_at}
             />
-            <div className="flex gap-1">
-              {'conversation_id' in item && (
-                <MessageSquare className="h-4 w-4 text-gray-500" />
-              )}
-              {(item.post_id || 'message_id' in item) && (
-                <Waves className="h-4 w-4 text-gray-500" />
-              )}
-            </div>
           </div>
         ))}
       </div>

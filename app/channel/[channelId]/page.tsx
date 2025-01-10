@@ -278,11 +278,39 @@ export default function Channel() {
     e.preventDefault()
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
+    // Create a temporary post for optimistic update
+    const tempPost: Post = {
+      id: `temp-${Date.now()}`, // temporary ID that will be replaced
+      user_id: currentUser?.id || '',
+      channel_id: channelId as string,
+      content: newMessage.trim(),
+      created_at: new Date().toISOString(),
+      user: {
+        id: currentUser?.id || '',
+        email: currentUser?.email || '',
+        display_name: currentUser?.display_name,
+        native_language: currentUser?.native_language
+      },
+      files: [], // Will be updated after file upload
+      translation: null
+    }
+
     try {
       if (!currentUser) throw new Error('User not authenticated')
 
+      // Optimistically add the post to the state
+      setPosts(prevPosts => [...prevPosts, tempPost])
+      
+      // Clear input immediately for better UX
+      setNewMessage('')
+      const filesToUpload = [...selectedFiles]
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+
       // First, upload any files
-      const filePromises = selectedFiles.map(async (file) => {
+      const filePromises = filesToUpload.map(async (file) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `${currentUser.id}/${fileName}`
@@ -333,13 +361,18 @@ export default function Channel() {
         throw new Error('Failed to send message')
       }
 
-      setNewMessage('')
-      setSelectedFiles([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      const actualPost = await response.json()
+
+      // Replace the temporary post with the actual one
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === tempPost.id ? { ...actualPost, files: uploadedFiles } : post
+        )
+      )
     } catch (error) {
       console.error('Error sending message:', error)
+      // Remove the temporary post if there was an error
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== tempPost.id))
       toast({
         title: "Error",
         description: "Failed to send message",

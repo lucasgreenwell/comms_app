@@ -109,6 +109,15 @@ export async function POST(request: Request) {
 
     if (error) throw error
 
+    // Fetch user data
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, email, display_name, native_language')
+      .eq('id', userId)
+      .single()
+
+    if (userError) throw userError
+
     // Create translations for the post
     if (content?.trim()) {
       try {
@@ -127,7 +136,15 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json(post)
+    // Return post with user information
+    const postWithUser = {
+      ...post,
+      user,
+      files: [],
+      translation: null
+    }
+
+    return NextResponse.json(postWithUser)
   } catch (error) {
     console.error('Error creating post:', error)
     return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
