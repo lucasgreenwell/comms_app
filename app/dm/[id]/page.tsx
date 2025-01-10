@@ -392,23 +392,25 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
     try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('User not authenticated')
 
       // First, upload any files
-      const filePromises = selectedFiles.map(async (file) => {
+      const filePromises = selectedFiles.map(async (file: File) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
         const filePath = `${user.id}/${fileName}`
 
         // Upload file to storage
-        const { error: uploadError } = await getSupabase().storage
+        const { error: uploadError } = await supabase.storage
           .from('file-uploads')
           .upload(filePath, file)
 
         if (uploadError) throw uploadError
 
         // Create file record
-        const { data: fileData, error: fileRecordError } = await getSupabase()
+        const { data: fileData, error: fileRecordError } = await supabase
           .from('files')
           .insert({
             file_name: file.name,
@@ -423,39 +425,77 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
 
         if (fileRecordError) throw fileRecordError
 
-        return fileData
+        return fileData as FileUpload
       })
 
       const uploadedFiles = await Promise.all(filePromises)
 
       // Create message
-      const response = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          conversationId: params.id,
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
           content: newMessage.trim(),
-          fileIds: uploadedFiles.map(file => file.id)
-        }),
-      })
+          conversation_id: params.id,
+          sender_id: user.id
+        })
+        .select()
+        .single()
 
-      if (!response.ok) {
-        throw new Error('Failed to send message')
+      if (messageError) throw messageError
+
+      // Create file attachments
+      if (uploadedFiles.length > 0) {
+        const { error: attachmentError } = await supabase
+          .from('file_attachments')
+          .insert(
+            uploadedFiles.map(file => ({
+              file_id: file.id,
+              message_id: messageData.id
+            }))
+          )
+
+        if (attachmentError) throw attachmentError
       }
 
+      // Clear input and show success immediately
       setNewMessage('')
       setSelectedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
+
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully."
+      })
+
+      // Trigger translation in the background
+      const triggerTranslation = async () => {
+        try {
+          await fetch('/api/translations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messageId: messageData.id,
+              senderId: user.id
+            }),
+          })
+        } catch (translationError) {
+          console.error('Translation error:', translationError)
+        }
+      }
+
+      // Don't await the translation
+      triggerTranslation()
+
     } catch (error) {
       console.error('Error sending message:', error)
       toast({
-        title: "Error",
-        description: "Failed to send message",
         variant: "destructive",
+        title: "Error sending message",
+        description: "There was an error sending your message. Please try again."
       })
     }
   }
