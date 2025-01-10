@@ -39,14 +39,19 @@ export default function UserDisplay({
 
   useEffect(() => {
     const fetchProfilePic = async () => {
-      const supabase = getSupabase();
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('profile_pic_url')
-        .eq('id', user.id)
-        .single();
-      
-      setProfilePicUrl(data?.profile_pic_url || null);
+      try {
+        const supabase = getSupabase();
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('profile_pic_url')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        setProfilePicUrl(data?.profile_pic_url || null);
+      } catch (error) {
+        // Silently handle the error - profile pic not found is an expected case
+        setProfilePicUrl(null);
+      }
     };
 
     fetchProfilePic();

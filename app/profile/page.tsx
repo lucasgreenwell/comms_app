@@ -66,20 +66,30 @@ export default function ProfilePage() {
   }
 
   const fetchUser = async () => {
-    const currentUser = await getCurrentUser() as ExtendedUser
-    setUser(currentUser)
-    setDisplayName(currentUser?.display_name || '')
-    setSelectedLanguage(currentUser?.native_language || '')
-    
-    if (currentUser) {
-      const supabase = getSupabase()
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('profile_pic_url')
-        .eq('id', currentUser.id)
-        .single()
+    try {
+      const currentUser = await getCurrentUser() as ExtendedUser
+      setUser(currentUser)
+      setDisplayName(currentUser?.display_name || '')
+      setSelectedLanguage(currentUser?.native_language || '')
       
-      setProfilePicUrl(data?.profile_pic_url || null)
+      if (currentUser) {
+        try {
+          const supabase = getSupabase()
+          const { data } = await supabase
+            .from('user_profiles')
+            .select('profile_pic_url')
+            .eq('id', currentUser.id)
+            .maybeSingle()
+          
+          setProfilePicUrl(data?.profile_pic_url || null)
+        } catch (error) {
+          // Silently handle the error - profile pic not found is an expected case
+          setProfilePicUrl(null)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching user:', error)
+      toast.error('Failed to load user data')
     }
   }
 
