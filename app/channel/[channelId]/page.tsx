@@ -504,7 +504,7 @@ export default function Channel() {
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
               className={`flex-1 ${
-                tourStep === 2 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+                tourStep === 2 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-slow-pulse' : ''
               } transition-all duration-300`}
             />
             <Button 
@@ -513,7 +513,7 @@ export default function Channel() {
               size="icon"
               onClick={() => fileInputRef.current?.click()}
               className={`${
-                tourStep === 2 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+                tourStep === 2 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
               } transition-all duration-300`}
             >
               <Paperclip className="h-4 w-4" />
@@ -521,7 +521,7 @@ export default function Channel() {
             <Button 
               type="submit"
               className={`${
-                tourStep === 2 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+                tourStep === 2 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
               } transition-all duration-300`}
             >
               Send

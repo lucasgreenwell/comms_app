@@ -265,7 +265,7 @@ export default function ProfilePage() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder={user?.display_name || "Enter display name"}
                 className={`${
-                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-slow-pulse' : ''
                 } transition-all duration-300`}
               />
               <Button type="submit" size="sm">
@@ -278,7 +278,7 @@ export default function ProfilePage() {
             <Select value={selectedLanguage} onValueChange={handleLanguageChange}>
               <SelectTrigger 
                 className={`w-full ${
-                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-pulse' : ''
+                  tourStep === 4 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-slow-pulse' : ''
                 } transition-all duration-300`}
               >
                 <SelectValue placeholder={languages.find(lang => lang.id === user?.native_language)?.language || "Select a language"} />

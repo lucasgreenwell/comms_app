@@ -434,7 +434,7 @@ export default function Sidebar() {
           onClick={() => setIsSearchOpen(true)} 
           variant="ghost" 
           size="icon"
-          className={`${tourStep === 3 ? 'scale-150 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''} transition-all duration-300`}
+          className={`${tourStep === 3 ? 'scale-150 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''} transition-all duration-300`}
         >
           <Search className="h-5 w-5" />
         </Button>
@@ -491,7 +491,7 @@ export default function Sidebar() {
             <Button 
               variant="ghost" 
               className={`w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80 ${
-                tourStep === 1 ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+                tourStep === 1 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
               } transition-all duration-300`}
             >
               + Create Channel

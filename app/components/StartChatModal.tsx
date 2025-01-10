@@ -117,38 +117,18 @@ export default function StartChatModal({ isOpen, onClose, preselectedUserId, cus
         return
       }
 
-      const { data: conversation, error: convError } = await supabase
-        .from('conversations')
-        .insert({
-          type: selectedUsers.length === 1 ? 'dm' : 'group',
-          name: selectedUsers.length === 1 ? null : `Group Chat`
-        })
-        .select()
-        .single()
-
-      if (convError) throw convError
-
-      const participants = allParticipantIds.map(userId => ({
-        conversation_id: conversation.id,
-        user_id: userId
-      }))
-
-      const { error: partError } = await supabase
-        .from('conversation_participants')
-        .insert(participants)
-
-      if (partError) throw partError
-
-      const { data: finalCheck } = await supabase
-        .rpc('find_existing_conversation', {
-          participant_ids: allParticipantIds
+      const { data: conversationId, error: createError } = await supabase
+        .rpc('create_conversation_with_participants', {
+          p_type: selectedUsers.length === 1 ? 'dm' : 'group',
+          p_name: selectedUsers.length === 1 ? null : 'Group Chat',
+          p_participant_ids: allParticipantIds
         })
 
-      const finalConversationId = finalCheck || conversation.id
+      if (createError) throw createError
 
       onClose()
       setSelectedUsers([])
-      router.push(`/dm/${finalConversationId}`)
+      router.push(`/dm/${conversationId}`)
     } catch (error) {
       console.error('Error creating conversation:', error)
       toast({
@@ -227,7 +207,7 @@ export default function StartChatModal({ isOpen, onClose, preselectedUserId, cus
           onClick={handleStartChat}
           disabled={selectedUsers.length === 0 || isLoading}
           className={`w-full ${theme.colors.accent} p-2 rounded disabled:opacity-50 hover:bg-opacity-80 ${
-            showStartChatAnimation ? 'scale-110 animate-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+            showStartChatAnimation ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
           } transition-all duration-300`}
         >
           {isLoading ? 'Creating...' : 'Start Chat'}
