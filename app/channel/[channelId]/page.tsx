@@ -366,7 +366,7 @@ export default function Channel() {
       // Replace the temporary post with the actual one
       setPosts(prevPosts => 
         prevPosts.map(post => 
-          post.id === tempPost.id ? { ...actualPost, files: uploadedFiles } : post
+          post.id.startsWith('temp-') ? { ...actualPost, files: uploadedFiles } : post
         )
       )
     } catch (error) {
