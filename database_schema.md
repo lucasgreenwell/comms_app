@@ -1,4 +1,4 @@
-# Database Schema Documentation
+# Database Schema Documentation (Updated)
 
 ## Tables
 
@@ -41,11 +41,11 @@
 ---
 
 ### 4. **channel_members**
-| Column      | Type        | Description                                                          |
-|-------------|------------|----------------------------------------------------------------------|
-| **id**      | UUID       | Primary key                                                          |
-| **user_id** | UUID       | FK to `users.id` (or `auth.users.id`) indicating which user joined   |
-| **channel_id** | UUID    | FK to `channels.id`                                                  |
+| Column       | Type        | Description                                                         |
+|--------------|------------|---------------------------------------------------------------------|
+| **id**       | UUID       | Primary key                                                         |
+| **user_id**  | UUID       | FK to `users.id` (or `auth.users.id`) indicating which user joined  |
+| **channel_id** | UUID     | FK to `channels.id`                                                 |
 | **created_at** | TIMESTAMPTZ | Timestamp when user joined this channel                           |
 
 **Notes**:  
@@ -55,7 +55,7 @@
 
 ### 5. **posts**
 | Column       | Type        | Description                                      |
-|-------------|------------|--------------------------------------------------|
+|--------------|------------|--------------------------------------------------|
 | **id**       | UUID       | Primary key                                      |
 | **created_at** | TIMESTAMPTZ | Timestamp of post creation (UTC)               |
 | **content**  | TEXT       | Post’s textual content                           |
@@ -69,7 +69,7 @@
 
 ### 6. **post_thread_comments**
 | Column       | Type        | Description                                                             |
-|-------------|------------|-------------------------------------------------------------------------|
+|--------------|------------|-------------------------------------------------------------------------|
 | **id**       | UUID       | Primary key                                                             |
 | **post_id**  | UUID       | FK to `posts.id`                                                        |
 | **user_id**  | UUID       | FK to `users.id` (the commenter)                                        |
@@ -98,7 +98,7 @@
 
 ### 8. **presence**
 | Column       | Type         | Description                                  |
-|-------------|-------------|----------------------------------------------|
+|--------------|-------------|----------------------------------------------|
 | **user_id**  | UUID        | FK to `users.id` (which user)                |
 | **is_online**| BOOLEAN     | Whether the user is currently online         |
 | **last_seen**| TIMESTAMPTZ | Timestamp of last activity or sign-off       |
@@ -109,11 +109,11 @@
 ---
 
 ### 9. **top_languages**
-| Column   | Type | Description                                              |
-|----------|------|----------------------------------------------------------|
-| **id**   | UUID | Primary key                                              |
+| Column    | Type | Description                                              |
+|-----------|------|----------------------------------------------------------|
+| **id**    | UUID | Primary key                                              |
 | **language** | TEXT | Human-readable language name (e.g. “English”, “Spanish”) |
-| **code** | TEXT | Language code (e.g., “en”, “es”)                         |
+| **code**  | TEXT | Language code (e.g., “en”, “es”)                         |
 
 **Notes**:  
 - May be used to populate user language preferences or references.
@@ -149,7 +149,7 @@
 
 ### 11. **conversations**
 | Column       | Type        | Description                                                                   |
-|-------------|------------|-------------------------------------------------------------------------------|
+|--------------|------------|-------------------------------------------------------------------------------|
 | **id**       | UUID       | Primary key                                                                   |
 | **name**     | TEXT       | Conversation name (for group chats, etc.)                                     |
 | **type**     | TEXT       | Could indicate “direct”, “group”, “channel-based”, etc.                       |
@@ -162,15 +162,17 @@
 ---
 
 ### 12. **conversation_participants**
-| Column             | Type        | Description                                                         |
-|--------------------|------------|---------------------------------------------------------------------|
-| **conversation_id**| UUID       | FK to `conversations.id`                                            |
-| **user_id**        | UUID       | FK to `users.id`                                                    |
-| **created_at**     | TIMESTAMPTZ | Timestamp when user joined or was added to the conversation         |
+| Column             | Type        | Description                                                                |
+|--------------------|------------|----------------------------------------------------------------------------|
+| **conversation_id**| UUID       | FK to `conversations.id`                                                   |
+| **user_id**        | UUID       | FK to `users.id`                                                           |
+| **created_at**     | TIMESTAMPTZ | Timestamp when user joined or was added to the conversation                |
+| **last_read_at**   | TIMESTAMPTZ | (New) Timestamp when the user last read all available messages in the convo|
 
 **Notes**:  
 - Tracks which users are in which conversation.  
-- Often used for direct messages (2 participants) or group chats (multiple participants).
+- Often used for direct messages (2 participants) or group chats (multiple participants).  
+- `last_read_at` is used to compute unread messages for each participant.
 
 ---
 
@@ -180,7 +182,7 @@
 | **id**             | INT4       | Primary key (integer sequence)                             |
 | **participant_key**| TEXT       | Possibly an encryption or identity key for the participant |
 | **conversation_id**| UUID       | FK to `conversations.id`                                   |
-| **created_at**     | TIMESTAMPTZ | Timestamp of creation                                     |
+| **created_at**     | TIMESTAMPTZ | Timestamp of creation                                      |
 
 **Notes**:  
 - Could be used to manage additional security keys or tokens for participants in a conversation.
@@ -220,7 +222,7 @@
 
 ### 16. **files**
 | Column       | Type        | Description                                           |
-|-------------|------------|-------------------------------------------------------|
+|--------------|------------|-------------------------------------------------------|
 | **id**       | UUID       | Primary key                                           |
 | **file_name**| TEXT       | Original file name                                    |
 | **file_type**| TEXT       | MIME type or general file type                        |
@@ -252,12 +254,28 @@
 
 ---
 
+### 18. **message_reads** (Optional for Per-Message Read Receipts)
+| Column      | Type        | Description                                                  |
+|-------------|------------|--------------------------------------------------------------|
+| **id**      | UUID       | Primary key (default `gen_random_uuid()`)                    |
+| **message_id** | UUID    | FK to `messages.id`                                          |
+| **user_id** | UUID       | FK to `users.id` (the user who read the message)             |
+| **read_at** | TIMESTAMPTZ | Timestamp when the user read the message                    |
+
+**Notes**:  
+- Only needed if you want fine-grained read receipts.  
+- A unique constraint on `(message_id, user_id)` ensures no duplicates.  
+
+---
+
 ## Notes
 - Most `id` columns are `UUID` primary keys.  
 - The `created_at` columns are generally `timestamptz` (UTC timestamps).  
 - Many tables include user references (likely `users.id` or possibly `auth.users.id`).  
 - Relationship tables (e.g., **channel_members**, **conversation_participants**) handle many-to-many links.  
-- Some tables (like **translations**, **file_attachments**, **emoji_reactions**) can reference multiple content tables by including columns such as `message_id`, `post_id`, or `comment_id`. Usually only one of those columns is used per record.
+- Some tables (like **translations**, **file_attachments**, **emoji_reactions**) can reference multiple content tables by including columns such as `message_id`, `post_id`, or `comment_id`. Usually only one of those columns is used per record.  
+- We’ve added `last_read_at` to **conversation_participants** for conversation-level read tracking.  
+- We’ve optionally created **message_reads** for per-message read receipts if that’s needed in the future.
 
 ## Authentication
 - The `users` table may be linked to the authentication system via `auth.users.id`.  
@@ -276,5 +294,6 @@
 3. **Conversations** track multiple **messages**; users join conversations via **conversation_participants**.  
 4. **Thread Comments** exist for both **posts** and **messages** (via `post_thread_comments` and `conversation_thread_comments`).  
 5. **Translations**, **file_attachments**, and **emoji_reactions** can reference any of the post/message/comment tables.  
+6. **message_reads** (if implemented) associates a user and a specific message for detailed read tracking.  
 
 ---
