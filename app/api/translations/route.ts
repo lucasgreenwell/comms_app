@@ -41,80 +41,101 @@ async function createTranslations(
   content: string,
   messageId: string | null = null,
   conversationThreadCommentId: string | null = null,
-  targetLanguage: string
+  targetLanguages: Map<string, string>
 ) {
   try {
-    const translation = await translateText(content, targetLanguage)
-    if (!translation) return null
-
     const translationData: any = {
       created_at: new Date().toISOString()
-    }
+    };
 
-    // Set the appropriate translation field based on the target language
-    switch (targetLanguage) {
-      case 'zh':
-        translationData.mandarin_chinese_translation = translation
-        break
-      case 'es':
-        translationData.spanish_translation = translation
-        break
-      case 'en':
-        translationData.english_translation = translation
-        break
-      case 'hi':
-        translationData.hindi_translation = translation
-        break
-      case 'ar':
-        translationData.arabic_translation = translation
-        break
-      case 'bn':
-        translationData.bengali_translation = translation
-        break
-      case 'pt':
-        translationData.portuguese_translation = translation
-        break
-      case 'ru':
-        translationData.russian_translation = translation
-        break
-      case 'ja':
-        translationData.japanese_translation = translation
-        break
-      case 'pa':
-        translationData.western_punjabi_translation = translation
-        break
-      default:
-        return null
+    // Translate content for each target language and set the appropriate field
+    for (const [languageId, languageCode] of targetLanguages) {
+      const translation = await translateText(content, languageCode);
+      if (!translation) continue;
+
+      switch (languageCode) {
+        case 'zh':
+          translationData.mandarin_chinese_translation = translation;
+          break;
+        case 'es':
+          translationData.spanish_translation = translation;
+          break;
+        case 'en':
+          translationData.english_translation = translation;
+          break;
+        case 'hi':
+          translationData.hindi_translation = translation;
+          break;
+        case 'ar':
+          translationData.arabic_translation = translation;
+          break;
+        case 'bn':
+          translationData.bengali_translation = translation;
+          break;
+        case 'pt':
+          translationData.portuguese_translation = translation;
+          break;
+        case 'ru':
+          translationData.russian_translation = translation;
+          break;
+        case 'ja':
+          translationData.japanese_translation = translation;
+          break;
+        case 'pa':
+          translationData.western_punjabi_translation = translation;
+          break;
+        default:
+          continue;
+      }
     }
 
     // Set the appropriate ID field
     if (messageId) {
-      translationData.message_id = messageId
+      translationData.message_id = messageId;
     } else if (conversationThreadCommentId) {
-      translationData.conversation_thread_comment_id = conversationThreadCommentId
+      translationData.conversation_thread_comment_id = conversationThreadCommentId;
     }
 
     const { data, error } = await supabase
       .from('translations')
       .insert([translationData])
-      .select()
-      .single()
+      .select();
 
-    if (error) throw error
-    return data
+    if (error) throw error;
+    return data?.[0] || null;
   } catch (error) {
-    console.error('Error in createTranslations:', error)
-    return null
+    console.error('Error in createTranslations:', error);
+    return null;
   }
+}
+
+interface MessageResponse {
+  content: string;
+  conversation_id: string;
+}
+
+interface ThreadCommentResponse {
+  content: string;
+  message: {
+    conversation_id: string;
+  };
+}
+
+interface ParticipantResponse {
+  user: {
+    id: string;
+    native_language: string | null;
+  };
 }
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { messageId, conversationThreadCommentId, senderId } = body
+    const body = await request.json();
+    const { messageId, conversationThreadCommentId, senderId } = body;
 
     if (!senderId || (!messageId && !conversationThreadCommentId)) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+      console.error('Missing required fields');
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Get the sender's native language
@@ -122,107 +143,115 @@ export async function POST(request: Request) {
       .from('users')
       .select('native_language')
       .eq('id', senderId)
-      .single()
+      .single();
 
-    if (senderError) throw senderError
+    if (senderError) {
+      console.error('Error fetching sender language:', senderError);
+      throw senderError;
+    }
 
-    // Get the recipient's native language
-    let recipientId: string
+    let content: string;
+    let conversationId: string;
+
+    // Get the message content and conversation ID
     if (messageId) {
-      // For direct messages, get the conversation participants
       const { data: message, error: messageError } = await supabase
         .from('messages')
-        .select('conversation_id')
+        .select('content, conversation_id')
         .eq('id', messageId)
-        .single()
+        .single() as { data: MessageResponse | null, error: any };
 
-      if (messageError) throw messageError
-
-      const { data: participants, error: participantsError } = await supabase
-        .from('conversation_participants')
-        .select('user_id')
-        .eq('conversation_id', message.conversation_id)
-        .neq('user_id', senderId)
-        .single()
-
-      if (participantsError) throw participantsError
-      recipientId = participants.user_id
+      if (messageError) {
+        console.error('Error fetching message:', messageError);
+        throw messageError;
+      }
+      if (!message) {
+        console.error('Message not found');
+        throw new Error('Message not found');
+      }
+      
+      content = message.content;
+      conversationId = message.conversation_id;
     } else {
-      // For thread comments, get the original message sender
       const { data: comment, error: commentError } = await supabase
         .from('conversation_thread_comments')
-        .select('message_id')
+        .select('content, message:message_id(conversation_id)')
         .eq('id', conversationThreadCommentId)
-        .single()
+        .single() as { data: ThreadCommentResponse | null, error: any };
 
-      if (commentError) throw commentError
-
-      const { data: message, error: messageError } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .eq('id', comment.message_id)
-        .single()
-
-      if (messageError) throw messageError
-      recipientId = message.sender_id
-    }
-
-    // Get recipient's language preference
-    const { data: recipient, error: recipientError } = await supabase
-      .from('users')
-      .select('native_language')
-      .eq('id', recipientId)
-      .single()
-
-    if (recipientError) throw recipientError
-
-    // Only translate if languages are different
-    if (sender.native_language !== recipient.native_language) {
-      // Get the message content
-      let content: string
-      if (messageId) {
-        const { data: message, error: messageError } = await supabase
-          .from('messages')
-          .select('content')
-          .eq('id', messageId)
-          .single()
-
-        if (messageError) throw messageError
-        content = message.content
-      } else {
-        const { data: comment, error: commentError } = await supabase
-          .from('conversation_thread_comments')
-          .select('content')
-          .eq('id', conversationThreadCommentId)
-          .single()
-
-        if (commentError) throw commentError
-        content = comment.content
+      if (commentError) {
+        console.error('Error fetching comment:', commentError);
+        throw commentError;
       }
-
-      // Get the language code for translation
-      const { data: recipientLanguage, error: languageError } = await supabase
-        .from('top_languages')
-        .select('code')
-        .eq('id', recipient.native_language)
-        .single()
-
-      if (languageError) throw languageError
-
-      // Create the translation
-      const translation = await createTranslations(
-        content,
-        messageId,
-        conversationThreadCommentId,
-        recipientLanguage.code
-      )
-
-      return NextResponse.json(translation)
+      if (!comment) {
+        console.error('Comment not found');
+        throw new Error('Comment not found');
+      }
+      
+      content = comment.content;
+      conversationId = comment.message.conversation_id;
     }
 
-    return NextResponse.json({ message: 'No translation needed' })
+    // Get all participants in the conversation except the sender
+    const { data: participants, error: participantsError } = await supabase
+      .from('conversation_participants')
+      .select(`
+        user:user_id (
+          id,
+          native_language
+        )
+      `)
+      .eq('conversation_id', conversationId)
+      .neq('user_id', senderId) as { data: ParticipantResponse[] | null, error: any };
+
+    if (participantsError) {
+      console.error('Error fetching participants:', participantsError);
+      throw participantsError;
+    }
+    if (!participants) {
+      console.error('No participants found');
+      throw new Error('No participants found');
+    }
+
+    // Get unique target languages (excluding sender's language and null values)
+    const targetLanguages = new Set(
+      participants
+        .map(p => p.user.native_language)
+        .filter((lang): lang is string => lang !== null && lang !== sender.native_language)
+    );
+
+    // Get all language codes at once
+    const { data: languagesData, error: languagesError } = await supabase
+      .from('top_languages')
+      .select('id, code')
+      .in('id', Array.from(targetLanguages));
+
+    if (languagesError) {
+      console.error('Error fetching language codes:', languagesError);
+      throw languagesError;
+    }
+
+    if (!languagesData) {
+      console.error('No language codes found for:', Array.from(targetLanguages));
+      throw new Error('No language codes found');
+    }
+
+    // Create a map of language IDs to codes for easy lookup
+    const languageCodeMap = new Map(
+      languagesData.map(lang => [lang.id, lang.code])
+    );
+
+    // Create a single translation entry with all languages
+    const translation = await createTranslations(
+      content,
+      messageId,
+      conversationThreadCommentId,
+      languageCodeMap
+    );
+
+    return NextResponse.json(translation, { headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('Error in translation endpoint:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('Error in translation endpoint:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 } 
