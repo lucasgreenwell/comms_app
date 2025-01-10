@@ -582,110 +582,172 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   }, [messages])
 
   return (
-    <div className="flex h-full">
-      <div className={`flex-1 flex flex-col h-full ${activeThread ? 'max-w-[calc(100%-400px)]' : ''}`}>
-        <h1 className="text-2xl font-bold mb-4 p-4">
-          {conversation?.type === 'dm' ? (
-            <div className="flex items-center">
-              Chat with{' '}
-              {participants[0] && (
-                <UserDisplay 
-                  user={participants[0]}
-                  isOnline={onlineUsers.has(participants[0].id)}
-                  className="ml-2"
-                />
-              )}
-            </div>
-          ) : (
-            <div>
-              <div>{conversation?.name || 'Group Chat'}</div>
-              <div className="text-sm font-normal text-gray-500 flex flex-wrap gap-2">
-                {participants.map((p, i) => (
-                  <span key={p.id}>
-                    <UserDisplay 
-                      user={p}
-                      isOnline={onlineUsers.has(p.id)}
-                    />
-                    {i < participants.length - 1 ? ',' : ''}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </h1>
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-4">
-            {messages.map((message) => (
-              <MessageItem 
-                key={message.id} 
-                message={message} 
-                currentUser={user} 
-                onlineUsers={onlineUsers}
-                onThreadOpen={handleThreadOpen}
-              />
-            ))}
-          </div>
-        </div>
-        <form onSubmit={sendMessage} className="p-4 border-t space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 p-2 border rounded"
-              placeholder="Type your message..."
-            />
-            <Button 
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button type="submit">
-              Send
-            </Button>
-          </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple
+    <div
+      className={`relative p-4 rounded-lg shadow-sm transition-transform transform hover:scale-[1.02] bg-white group ${messageAlignment} ${maxWidth} ${className}`}
+    >
+      <div className="flex justify-between items-start">
+        {/* User and Message Content */}
+        <div className="flex-1 min-w-0">
+          <UserDisplay
+            user={user}
+            isOnline={onlineUsers.has(user.id)}
+            className="text-sm font-semibold text-gray-800"
           />
-          {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                  <span className="text-sm">{file.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => removeFile(index)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">{content}</div>
+              </TooltipTrigger>
+              {getTranslatedContent() && (
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  className="z-50 bg-white shadow-lg border rounded-md p-3"
+                  style={{
+                    maxWidth: '300px',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  <p className="text-sm text-gray-600">{getTranslatedContent()}</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+          {/* Files */}
+          {files && files.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center p-2 bg-gray-50 rounded-md border hover:bg-gray-100 transition-colors"
+                >
+                  <FileIcon className="h-5 w-5 text-gray-500" />
+                  <div className="flex-1 ml-3 min-w-0">
+                    <div className="text-sm font-medium truncate">{file.file_name}</div>
+                    <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-blue-600"
+                      onClick={() => handleDownload(file)}
+                    >
+                      <Download className="h-5 w-5" />
+                    </Button>
+                    {isOwner && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-red-600"
+                        onClick={() => handleFileDelete(file)}
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
           )}
-        </form>
+          {/* Reactions */}
+          <div className="mt-3 flex gap-2 flex-wrap">
+            {Object.entries(groupedReactions).map(([emoji, reactions]) => (
+              <Button
+                key={emoji}
+                size="sm"
+                variant="outline"
+                className="px-3 py-1 text-sm rounded-full border-gray-300 hover:bg-gray-100"
+                onClick={() => {
+                  const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                  if (userReaction) {
+                    handleRemoveReaction(userReaction.id);
+                  } else {
+                    handleAddReaction(emoji);
+                  }
+                }}
+              >
+                <span>{emoji}</span>
+                <span className="ml-1 text-gray-500">{reactions.length}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+        {/* Action Buttons */}
+        <div className="flex flex-col items-end space-y-2">
+          <div className="flex items-center gap-2">
+            {currentUser && !hideActions && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Smile className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2 bg-white shadow-lg rounded-md">
+                  <div className="grid grid-cols-8 gap-2">
+                    {EMOJI_PAGES[currentPage].map((emoji) => (
+                      <Button
+                        key={emoji}
+                        size="sm"
+                        variant="ghost"
+                        className="p-2 hover:bg-gray-100 rounded-md"
+                        onClick={() => handleAddReaction(emoji)}
+                      >
+                        {emoji}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : EMOJI_PAGES.length - 1))}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-xs text-gray-500">
+                      Page {currentPage + 1} of {EMOJI_PAGES.length}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setCurrentPage((prev) => (prev < EMOJI_PAGES.length - 1 ? prev + 1 : 0))}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            {isOwner && !hideActions && (
+              <>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setIsEditing(true)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Edit2 className="h-5 w-5 text-gray-700" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleDelete}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-600"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+              </>
+            )}
+          </div>
+          <span className="text-xs text-gray-500">{formatTimestamp(created_at)}</span>
+        </div>
       </div>
-      {activeThread && (
-        <ConversationThreadComments 
-          messageId={activeThread.messageId}
-          conversationId={params.id}
-          originalMessage={{
-            id: activeThread.messageId,
-            content: activeThread.content,
-            sender: activeThread.sender
-          }}
-          onClose={handleThreadClose}
-        />
-      )}
     </div>
-  )
+  );
+  
 } 

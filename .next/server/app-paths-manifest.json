@@ -1,4 +1,6 @@
 {
   "/dm/[id]/page": "app/dm/[id]/page.js",
-  "/api/translations/route": "app/api/translations/route.js"
+  "/profile/page": "app/profile/page.js",
+  "/page": "app/page.js",
+  "/channel/[channelId]/page": "app/channel/[channelId]/page.js"
 }

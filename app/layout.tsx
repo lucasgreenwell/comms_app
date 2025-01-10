@@ -63,10 +63,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Notification />
-        <SidebarProvider>
+        <SidebarProvider >
           <div className="flex h-screen">
             {user && <Sidebar />}
-            <main className="flex-1 overflow-auto min-w-[80vw]">
+            <main className="flex-1 overflow-auto min-w-[85vw]">
               {children}
             </main>
           </div>

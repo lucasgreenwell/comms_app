@@ -359,7 +359,7 @@ export default function Sidebar() {
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
-    <aside className={`w-64 ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
+    <aside className={`min-w-[15vw] ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Channels</h2>
         <Button onClick={() => setIsSearchOpen(true)} variant="ghost" size="icon">
