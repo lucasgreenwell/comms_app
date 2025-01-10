@@ -559,18 +559,6 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         .eq('user_id', user.id)
         .single()
 
-      if (participantError) {
-        console.error('Error checking participant:', participantError)
-        return
-      }
-
-      if (!participant) {
-        console.error('User is not a participant in this conversation')
-        return
-      }
-
-      console.log('Found participant record:', participant)
-
       // Now update the last_read_at timestamp
       const { data, error } = await supabase
         .from('conversation_participants')
@@ -581,12 +569,6 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         .eq('user_id', user.id)
         .select('conversation_id, user_id, last_read_at')
 
-      if (error) {
-        console.error('Error updating last_read_at:', error)
-      } else {
-        console.log('Successfully updated last_read_at:', data)
-        console.log('Updated timestamp:', new Date().toISOString())
-      }
     } catch (error) {
       console.error('Error in updateLastReadTimestamp:', error)
     }

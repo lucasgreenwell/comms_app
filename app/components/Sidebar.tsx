@@ -42,6 +42,7 @@ interface DirectMessage {
     email: string
     display_name?: string
   }[]
+  unread_count?: number
 }
 
 interface Post {
@@ -73,11 +74,13 @@ export default function Sidebar() {
   const [isStartChatOpen, setIsStartChatOpen] = useState(false)
   const { onlineUsers } = usePresence()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchChannels()
     fetchCurrentUser()
     fetchDirectMessages()
+    fetchUnreadCounts()
     const supabase = getSupabase()
     
     // Set up subscription for channel membership changes
@@ -90,7 +93,7 @@ export default function Sidebar() {
           table: 'channel_members'
         }, 
         () => {
-          fetchChannels() // Refresh channels when memberships change
+          fetchChannels()
         }
       )
       .subscribe()
@@ -114,8 +117,21 @@ export default function Sidebar() {
           schema: 'public', 
           table: 'conversation_participants'
         }, 
+        (payload) => {
+          if (!payload.new || !('last_read_at' in payload.new)) {
+            fetchDirectMessages()
+          }
+          fetchUnreadCounts()
+        }
+      )
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
         () => {
-          fetchDirectMessages()
+          fetchUnreadCounts()
         }
       )
       .subscribe()
@@ -312,6 +328,34 @@ export default function Sidebar() {
     }
   }
 
+  const fetchUnreadCounts = async () => {
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) return
+
+      const { data, error } = await supabase
+        .rpc('get_unread_counts_for_user', {
+          p_user_id: user.id
+        })
+
+      if (error) {
+        console.error('Error fetching unread counts:', error)
+        return
+      }
+
+      const countsMap = data.reduce((acc: Record<string, number>, item: any) => {
+        acc[item.conversation_id] = item.unread_count
+        return acc
+      }, {})
+
+      setUnreadCounts(countsMap)
+    } catch (error) {
+      console.error('Error in fetchUnreadCounts:', error)
+    }
+  }
+
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
@@ -417,7 +461,7 @@ export default function Sidebar() {
               <li key={dm.conversation_id} className="mb-2">
                 <Link 
                   href={`/dm/${dm.conversation_id}`} 
-                  className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
+                  className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80 relative`}
                 >
                   <div className="flex items-center">
                     {dm.type === 'group' ? (
@@ -432,6 +476,11 @@ export default function Sidebar() {
                         user={dm.participants[0]}
                         isOnline={onlineUsers.has(dm.participants[0]?.id)}
                       />
+                    )}
+                    {unreadCounts[dm.conversation_id] > 0 && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCounts[dm.conversation_id]}
+                      </div>
                     )}
                   </div>
                 </Link>
