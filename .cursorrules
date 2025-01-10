@@ -1,0 +1,1 @@
+whenever you are writing SQL queries or connections to the database, be sure to check the database_schema.md file to see the correct column names and types.
