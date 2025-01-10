@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { createTranslations, getLanguages } from '../translations/utils'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Fetch posts with file attachments
+    // Fetch posts with file attachments and translations
     const { data: posts, error: postsError } = await supabase
       .from('posts')
       .select(`
@@ -38,6 +39,19 @@ export async function GET(request: Request) {
             file_size,
             path
           )
+        ),
+        translations (
+          id,
+          mandarin_chinese_translation,
+          spanish_translation,
+          english_translation,
+          hindi_translation,
+          arabic_translation,
+          bengali_translation,
+          portuguese_translation,
+          russian_translation,
+          japanese_translation,
+          western_punjabi_translation
         )
       `)
       .eq('channel_id', channelId)
@@ -49,16 +63,17 @@ export async function GET(request: Request) {
     const userIds = [...new Set(posts.map(post => post.user_id))]
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, email, display_name')
+      .select('id, email, display_name, native_language')
       .in('id', userIds)
 
     if (usersError) throw usersError
 
-    // Transform posts to include files array
+    // Transform posts to include files array and user info
     const postsWithUserInfo = posts.map(post => ({
       ...post,
       user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User', display_name: null },
-      files: post.file_attachments?.map(attachment => attachment.files) || []
+      files: post.file_attachments?.map(attachment => attachment.files) || [],
+      translation: post.translations?.[0] || null
     }))
 
     return NextResponse.json(postsWithUserInfo)
@@ -93,6 +108,24 @@ export async function POST(request: Request) {
       .single()
 
     if (error) throw error
+
+    // Create translations for the post
+    if (content?.trim()) {
+      try {
+        const languagesData = await getLanguages();
+        await createTranslations(
+          content.trim(),
+          null, // messageId
+          null, // conversationThreadCommentId
+          post.id, // postId
+          null, // postThreadCommentId
+          languagesData
+        );
+      } catch (translationError) {
+        console.error('Error creating translations:', translationError);
+        // Don't throw error here, just log it - we still want to return the post
+      }
+    }
 
     return NextResponse.json(post)
   } catch (error) {

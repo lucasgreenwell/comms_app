@@ -23,7 +23,7 @@ export const useUser = create<UserState>((set) => ({
         // Fetch additional user data from users table
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('id, email, display_name')
+          .select('id, email, display_name, native_language')
           .eq('id', user.id)
           .single()
           

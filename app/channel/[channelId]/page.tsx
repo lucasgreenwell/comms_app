@@ -9,26 +9,7 @@ import { LogOut, Paperclip, X } from 'lucide-react'
 import PostItem from './PostItem'
 import ThreadComments from './ThreadComments'
 import { useToast } from "@/components/ui/use-toast"
-
-interface Post {
-  id: string
-  user_id: string
-  channel_id: string
-  content: string
-  created_at: string
-  user: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-}
+import { Post } from '@/app/types/post'
 
 interface Channel {
   id: string
@@ -48,11 +29,30 @@ export default function Channel() {
   const [activeThread, setActiveThread] = useState<{
     postId: string;
     content: string;
+    created_at: string;
     user: {
       id: string;
       email: string;
       display_name?: string | null;
+      native_language?: string | null;
     };
+    translation?: {
+      id: string;
+      message_id: string | null;
+      conversation_thread_comment_id: string | null;
+      post_id: string | null;
+      post_thread_comment_id: string | null;
+      mandarin_chinese_translation: string | null;
+      spanish_translation: string | null;
+      english_translation: string | null;
+      hindi_translation: string | null;
+      arabic_translation: string | null;
+      bengali_translation: string | null;
+      portuguese_translation: string | null;
+      russian_translation: string | null;
+      japanese_translation: string | null;
+      western_punjabi_translation: string | null;
+    } | null;
   } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,7 +79,9 @@ export default function Channel() {
         setActiveThread({
           postId: post.id,
           content: post.content,
-          user: post.user
+          created_at: post.created_at,
+          user: post.user,
+          translation: post.translation
         })
       }
     }
@@ -415,7 +417,9 @@ export default function Channel() {
     setActiveThread({
       postId: post.id,
       content: post.content,
-      user: post.user
+      created_at: post.created_at,
+      user: post.user,
+      translation: post.translation
     })
   }
 
@@ -561,7 +565,9 @@ export default function Channel() {
           originalPost={{
             id: activeThread.postId,
             content: activeThread.content,
-            user: activeThread.user
+            created_at: activeThread.created_at,
+            user: activeThread.user,
+            translation: activeThread.translation
           }}
           onClose={handleThreadClose} 
         />

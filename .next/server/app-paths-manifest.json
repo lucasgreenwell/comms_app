@@ -3,5 +3,6 @@
   "/profile/page": "app/profile/page.js",
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
   "/page": "app/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/api/posts/route": "app/api/posts/route.js",
+  "/api/translations/route": "app/api/translations/route.js"
 }

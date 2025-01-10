@@ -13,6 +13,7 @@ interface ThreadComment {
     id: string
     email: string
     display_name?: string | null
+    native_language?: string | null
   }
   files?: {
     id: string
@@ -21,6 +22,23 @@ interface ThreadComment {
     file_size: number
     path: string
   }[]
+  translation?: {
+    id: string
+    message_id: string | null
+    conversation_thread_comment_id: string | null
+    post_id: string | null
+    post_thread_comment_id: string | null
+    mandarin_chinese_translation: string | null
+    spanish_translation: string | null
+    english_translation: string | null
+    hindi_translation: string | null
+    arabic_translation: string | null
+    bengali_translation: string | null
+    portuguese_translation: string | null
+    russian_translation: string | null
+    japanese_translation: string | null
+    western_punjabi_translation: string | null
+  } | null
 }
 
 interface ThreadCommentItemProps {
@@ -48,6 +66,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
       onUpdate={onCommentUpdate}
       tableName="post_thread_comments"
       created_at={comment.created_at}
+      translation={comment.translation}
     />
   )
 } 
