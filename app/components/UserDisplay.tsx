@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { getSupabase } from '../auth';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useUser } from '../hooks/useUser';
 
 interface UserDisplayProps {
   user: {
@@ -31,6 +32,10 @@ export default function UserDisplay({
     .join('')
     .toUpperCase()
     .slice(0, 2);
+
+  const { user: currentUser } = useUser();
+  const isCurrentUser = currentUser && user.id === currentUser.id;
+  const effectiveIsOnline = isCurrentUser || isOnline;
 
   useEffect(() => {
     const fetchProfilePic = async () => {
@@ -63,10 +68,10 @@ export default function UserDisplay({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
-              <span className={`text-lg leading-none ${isOnline ? 'text-green-500' : 'text-gray-400'}`}>●</span>
+              <span className={`text-lg leading-none ${effectiveIsOnline ? 'text-green-500' : 'text-gray-400'}`}>●</span>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{isOnline ? 'Online' : 'Offline'}</p>
+              <p>{effectiveIsOnline ? 'Online' : 'Offline'}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
