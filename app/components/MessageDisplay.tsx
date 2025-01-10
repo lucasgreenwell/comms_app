@@ -483,11 +483,11 @@ export default function MessageDisplay({
 
   if (isEditing) {
     return (
-      <div className={`${theme.colors.background} p-3 rounded transition-all duration-200 ${className}`}>
+      <div className="bg-white p-3 rounded transition-all duration-200">
         <UserDisplay 
           user={user}
           isOnline={onlineUsers.has(user.id)}
-          className={`font-bold ${theme.colors.foreground}`}
+          className="font-bold"
         />
         <div className="mt-2 flex gap-2">
           <Input
@@ -513,39 +513,40 @@ export default function MessageDisplay({
   }
 
   const isCurrentUser = currentUser?.id === user.id;
-  const messageAlignment = messageType === 'dm' 
-    ? (isCurrentUser ? 'ml-[50%]' : 'mr-[50%]')
-    : '';
-  const maxWidth = messageType === 'dm' ? 'max-w-[45%]' : '';
 
   return (
     <div
-      className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200 ${messageAlignment} ${maxWidth} ${className} relative pb-8`}
+      className={`bg-white py-3 px-6 rounded group hover:scale-[1.01] transition-all duration-200 relative pb-4 ${theme.colors.accent} hover:bg-opacity-15`}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <UserDisplay 
-            user={user}
-            isOnline={onlineUsers.has(user.id)}
-            className={`font-bold ${theme.colors.foreground}`}
-          />
+          <div className="flex items-center gap-2">
+            <UserDisplay 
+              user={user}
+              isOnline={onlineUsers.has(user.id)}
+              className="font-bold"
+            />
+            <span className="text-xs text-gray-500">
+              {formatTimestamp(created_at)}
+            </span>
+          </div>
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={theme.colors.foreground}>{content}</div>
+                <div>{content}</div>
               </TooltipTrigger>
               {getTranslatedContent() && (
                 <TooltipContent
                   side="top"
                   align="start"
-                  className="z-[9999] bg-white shadow-lg border rounded-lg p-3"
+                  className={`z-[9999] shadow-lg border rounded-lg p-3 ${theme.colors.background}`}
                   sideOffset={5}
                   style={{
                     maxWidth: '300px',
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  <p className="text-sm">{getTranslatedContent()}</p>
+                  <p className={`text-sm ${theme.colors.foreground}`}>{getTranslatedContent()}</p>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -588,13 +589,13 @@ export default function MessageDisplay({
           )}
           <div className="flex justify-between items-center mt-1">
             {/* Emoji Reactions */}
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 mt-1">
               {Object.entries(groupedReactions).map(([emoji, reactions]) => (
                 <Button
                   key={emoji}
                   size="sm"
                   variant="outline"
-                  className="h-6 px-2 py-1 text-xs rounded-full hover:bg-accent"
+                  className="h-8 px-3 py-1 text-sm rounded-full hover:bg-accent"
                   onClick={() => {
                     const userReaction = reactions.find(r => r.user_id === currentUser?.id);
                     if (userReaction) {
@@ -604,7 +605,7 @@ export default function MessageDisplay({
                     }
                   }}
                 >
-                  <span className="mr-1">{emoji}</span>
+                  <span className="mr-1.5 text-base">{emoji}</span>
                   <span>{reactions.length}</span>
                 </Button>
               ))}
@@ -696,9 +697,6 @@ export default function MessageDisplay({
               </>
             )}
           </div>
-          <span className={`text-xs ${theme.colors.foreground} absolute bottom-2 right-3`}>
-            {formatTimestamp(created_at)}
-          </span>
         </div>
       </div>
     </div>

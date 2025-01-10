@@ -475,8 +475,8 @@ export default function Channel() {
 
   return (
     <div className="flex h-full">
-      <div className={`flex-1 flex flex-col h-full p-4 ${activeThread ? 'max-w-[calc(100%-400px)]' : 'max-w-[1200px]'} mx-auto w-full`}>
-        <div className="flex justify-between items-center mb-4 w-full min-w-0">
+      <div className={`flex-1 flex flex-col h-full w-full`}>
+        <div className="flex justify-between items-center mb-4 w-full min-w-0 p-4">
           <h1 className="text-2xl font-bold truncate">
             # {channel?.name || 'Loading...'}
           </h1>
@@ -509,7 +509,7 @@ export default function Channel() {
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <form onSubmit={handleSendMessage} className="space-y-2">
+        <form onSubmit={handleSendMessage} className="space-y-2 p-4">
           <div className="flex gap-2">
             <Input
               type="text"

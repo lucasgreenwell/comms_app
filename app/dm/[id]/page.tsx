@@ -614,7 +614,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           )}
         </h1>
         <div className="flex-1 overflow-y-auto">
-          <div className="space-y-4 p-4">
+          <div>
             {messages.map((message) => (
               <MessageItem 
                 key={message.id} 
