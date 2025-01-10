@@ -48,6 +48,7 @@ export default function ConversationThreadCommentItem({ comment, onCommentUpdate
       messageType="dm_thread"
       onUpdate={onCommentUpdate}
       tableName="conversation_thread_comments"
+      created_at={comment.created_at}
     />
   )
 } 

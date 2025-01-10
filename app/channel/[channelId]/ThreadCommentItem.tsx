@@ -47,6 +47,7 @@ export default function ThreadCommentItem({ comment, onCommentUpdate }: ThreadCo
       messageType="post_thread"
       onUpdate={onCommentUpdate}
       tableName="post_thread_comments"
+      created_at={comment.created_at}
     />
   )
 } 

@@ -75,6 +75,7 @@ export default function MessageItem({ message, currentUser, onlineUsers, onThrea
       onUpdate={handleUpdate}
       tableName="messages"
       translation={translation}
+      created_at={message.created_at}
     />
   );
 } 

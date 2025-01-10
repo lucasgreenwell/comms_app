@@ -67,6 +67,7 @@ interface MessageDisplayProps {
   className?: string;
   hideActions?: boolean;
   translation?: Translation | null;
+  created_at: string;
 }
 
 // Common emojis that will be available in the picker
@@ -86,7 +87,8 @@ export default function MessageDisplay({
   tableName,
   className = '',
   hideActions,
-  translation
+  translation,
+  created_at
 }: MessageDisplayProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
@@ -98,6 +100,22 @@ export default function MessageDisplay({
     return themes[0];
   });
   const [reactions, setReactions] = useState<EmojiReaction[]>([]);
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    return date.toLocaleDateString([], { 
+      month: 'short', 
+      day: 'numeric',
+      year: today.getFullYear() !== date.getFullYear() ? 'numeric' : undefined 
+    }) + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   useEffect(() => {
     loadReactions();
@@ -489,8 +507,7 @@ export default function MessageDisplay({
 
   return (
     <div
-      className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200 ${messageAlignment} ${maxWidth} ${className}`}
-      style={{ position: 'relative' }}
+      className={`${theme.colors.background} bg-opacity-80 p-3 rounded group hover:scale-[1.01] hover:bg-opacity-100 transition-all duration-200 ${messageAlignment} ${maxWidth} ${className} relative pb-8`}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
@@ -556,36 +573,42 @@ export default function MessageDisplay({
               ))}
             </div>
           )}
-          {/* Emoji Reactions */}
-          <div className="mt-2 flex flex-wrap gap-1">
-            {Object.entries(groupedReactions).map(([emoji, reactions]) => (
-              <Button
-                key={emoji}
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 py-1 text-xs rounded-full hover:bg-accent"
-                onClick={() => {
-                  const userReaction = reactions.find(r => r.user_id === currentUser?.id);
-                  if (userReaction) {
-                    handleRemoveReaction(userReaction.id);
-                  } else {
-                    handleAddReaction(emoji);
-                  }
-                }}
-              >
-                <span className="mr-1">{emoji}</span>
-                <span>{reactions.length}</span>
-              </Button>
-            ))}
+          <div className="flex justify-between items-center mt-1">
+            {/* Emoji Reactions */}
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(groupedReactions).map(([emoji, reactions]) => (
+                <Button
+                  key={emoji}
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 py-1 text-xs rounded-full hover:bg-accent"
+                  onClick={() => {
+                    const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                    if (userReaction) {
+                      handleRemoveReaction(userReaction.id);
+                    } else {
+                      handleAddReaction(emoji);
+                    }
+                  }}
+                >
+                  <span className="mr-1">{emoji}</span>
+                  <span>{reactions.length}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col items-end">
+          <div className="flex gap-1">
             {currentUser && !hideActions && (
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <Smile className="h-3 w-3" />
+                    <Smile className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2">
@@ -605,40 +628,41 @@ export default function MessageDisplay({
                 </PopoverContent>
               </Popover>
             )}
+            {showThread && onThreadOpen && !hideActions && (
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                onClick={() => onThreadOpen({ id, content, user })}
+                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+              >
+                <Waves className="h-4 w-4" />
+                {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+              </Button>
+            )}
+            {isOwner && !hideActions && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => setIsEditing(true)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
-        </div>
-        <div className="flex gap-1">
-          {showThread && onThreadOpen && !hideActions && (
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              onClick={() => onThreadOpen({ id, content, user })}
-              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
-            >
-              <Waves className="h-4 w-4" />
-              {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
-            </Button>
-          )}
-          {isOwner && !hideActions && (
-            <>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={() => setIsEditing(true)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <Edit2 className="h-4 w-4" />
-              </Button>
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleDelete}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </>
-          )}
+          <span className={`text-xs ${theme.colors.foreground} absolute bottom-2 right-3`}>
+            {formatTimestamp(created_at)}
+          </span>
         </div>
       </div>
     </div>

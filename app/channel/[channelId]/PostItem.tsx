@@ -73,6 +73,7 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
       onUpdate={handleUpdate}
       tableName="posts"
       className="mb-4"
+      created_at={post.created_at}
     />
   )
 } 
