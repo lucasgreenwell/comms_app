@@ -1,7 +1,7 @@
 {
   "/profile/login/page": "app/profile/login/page.js",
   "/profile/signup/page": "app/profile/signup/page.js",
-  "/page": "app/page.js",
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/api/posts/route": "app/api/posts/route.js",
+  "/api/thread-comments/route": "app/api/thread-comments/route.js"
 }

@@ -10,59 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { themes } from '../../config/themes'
 import { usePresence } from '../../hooks/usePresence'
 import MessageDisplay from '../../components/MessageDisplay'
-
-interface ThreadComment {
-  id: string
-  user_id: string
-  post_id: string
-  content: string
-  created_at: string
-  user: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-}
-
-interface ThreadCommentsProps {
-  postId: string
-  onClose: () => void
-  originalPost: {
-    id: string
-    content: string
-    created_at: string
-    user: {
-      id: string
-      email: string
-      display_name?: string | null
-      native_language?: string | null
-    }
-    translation?: {
-      id: string
-      message_id: string | null
-      conversation_thread_comment_id: string | null
-      post_id: string | null
-      post_thread_comment_id: string | null
-      mandarin_chinese_translation: string | null
-      spanish_translation: string | null
-      english_translation: string | null
-      hindi_translation: string | null
-      arabic_translation: string | null
-      bengali_translation: string | null
-      portuguese_translation: string | null
-      russian_translation: string | null
-      japanese_translation: string | null
-      western_punjabi_translation: string | null
-    } | null
-  }
-}
+import type { ThreadComment } from '@/app/types/entities/ThreadComment'
+import type { ThreadCommentsProps } from '@/app/types/props/ThreadCommentsProps'
 
 export default function ThreadComments({ postId, onClose, originalPost }: ThreadCommentsProps) {
   const [comments, setComments] = useState<ThreadComment[]>([])

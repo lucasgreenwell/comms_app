@@ -3,3 +3,5 @@ Before every change, you need to check the readme.md in the feature folder to se
 After every change, you need to update the documentation to reflect the changes you've made. There is a readme.md in every feature folder that you need to update.
 
 whenever you are writing SQL queries or connections to the database, be sure to check the database_schema.md file to see the correct column names and types.
+
+do not create a new interface without searching our code to see if a preexisting one can be repurposed.

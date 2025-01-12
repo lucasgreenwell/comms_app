@@ -11,11 +11,7 @@ import PostItem from './PostItem'
 import ThreadComments from './ThreadComments'
 import { useToast } from "@/components/ui/use-toast"
 import { Post } from '@/app/types/post'
-
-interface Channel {
-  id: string
-  name: string
-}
+import type { Channel } from '@/app/types/entities/Channel'
 
 export default function Channel() {
   const { channelId } = useParams()

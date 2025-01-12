@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../../auth'
-import MessageDisplay from '../../components/MessageDisplay'
+import { useUser } from '../../hooks/useUser'
 import { usePresence } from '../../hooks/usePresence'
+import { Button } from '@/components/ui/button'
+import MessageDisplay from '../../components/MessageDisplay'
+import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import { useToast } from "@/components/ui/use-toast"
 import { Post } from '@/app/types/post'
-import { useUser } from '@/app/hooks/useUser'
-
-interface PostItemProps {
-  post: Post
-  onPostUpdate: (updatedPost: Post) => void
-  onThreadOpen: (post: Post) => void
-}
+import type { PostItemProps } from '@/app/types/props/PostItemProps'
 
 export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemProps) {
   const [threadCount, setThreadCount] = useState(0)
