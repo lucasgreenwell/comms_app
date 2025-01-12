@@ -14,38 +14,44 @@ app/dm/
 └── StartChatModal.tsx               # Modal for starting new conversations
 ```
 
-## Types
+## Type Definitions
 
-### User Types
+The type definitions for this feature have been moved to centralized type directories:
+
+### Entity Types (`app/types/entities/`)
+- `Message.ts` - Message entity interface
+- `User.ts` - User entity interface
+- `Conversation.ts` - Conversation entity interface
+- `FileAttachment.ts` - File attachment entity interface
+- `Translation.ts` - Translation entity interface
+
+### Props Types (`app/types/props/`)
+- `MessageItemProps.ts` - Props for MessageItem component
+- `StartChatModalProps.ts` - Props for StartChatModal component
+
+## TypeScript Types
+
+### Entity Types
 ```typescript
+// User
 interface User {
   id: string
   email: string
   display_name?: string | null
+  native_language?: string | null
 }
 
-interface Participant {
-  id: string
-  email: string
-  display_name?: string | null
-}
-```
-
-### Message Types
-```typescript
+// Message
 interface Message {
   id: string
   content: string
   created_at: string
-  sender: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
+  sender: User
   files?: FileAttachment[]
   translation: Translation | null
 }
 
+// FileAttachment
 interface FileAttachment {
   id: string
   file_name: string
@@ -53,28 +59,8 @@ interface FileAttachment {
   file_size: number
   path: string
 }
-```
 
-### Thread Types
-```typescript
-interface ThreadComment {
-  id: string
-  user_id: string
-  message_id: string
-  conversation_id: string
-  content: string
-  created_at: string
-  user: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: FileAttachment[]
-}
-```
-
-### Translation Types
-```typescript
+// Translation
 interface Translation {
   id: string
   message_id: string | null
@@ -92,16 +78,12 @@ interface Translation {
   japanese_translation: string | null
   western_punjabi_translation: string | null
 }
-```
 
-### Component Props Types
-```typescript
-interface StartChatModalProps {
-  isOpen: boolean
-  onClose: () => void
-  preselectedUserId?: string
-  customHeader?: string
-  showStartChatAnimation?: boolean
+// Conversation
+interface Conversation {
+  id: string
+  type: 'dm' | 'group'
+  name: string | null
 }
 ```
 

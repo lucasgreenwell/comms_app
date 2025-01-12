@@ -1,31 +1,22 @@
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
-import { X } from 'lucide-react'
-import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
-import { toast } from '@/components/ui/use-toast'
-import UserDisplay from '../components/UserDisplay'
+import { Button } from '@/components/ui/button'
+import { useToast } from "@/components/ui/use-toast"
+import { X } from 'lucide-react'
+import { useUser } from '../hooks/useUser'
 import { usePresence } from '../hooks/usePresence'
-
-interface User {
-  id: string
-  email: string
-  display_name?: string | null
-}
-
-interface StartChatModalProps {
-  isOpen: boolean
-  onClose: () => void
-  preselectedUserId?: string
-  customHeader?: string
-  showStartChatAnimation?: boolean
-}
+import UserDisplay from '../components/UserDisplay'
+import { themes } from '../config/themes'
+import type { StartChatModalProps } from '@/app/types/props/StartChatModalProps'
+import type { User } from '@/app/types/entities/User'
 
 export default function StartChatModal({ isOpen, onClose, preselectedUserId, customHeader, showStartChatAnimation }: StartChatModalProps) {
   const [users, setUsers] = useState<User[]>([])
   const [selectedUsers, setSelectedUsers] = useState<User[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const { toast } = useToast()
   const { onlineUsers } = usePresence()
   const [theme] = useState(() => {
     if (typeof window !== 'undefined') {

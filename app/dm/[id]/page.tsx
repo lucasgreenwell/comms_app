@@ -4,19 +4,13 @@ import { useState, useEffect, useRef } from 'react'
 import { getSupabase } from '../../auth'
 import { useUser } from '../../hooks/useUser'
 import { usePresence } from '../../hooks/usePresence'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import MessageItem from '../MessageItem'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import ConversationThreadComments from '../ConversationThreadComments'
 import { Paperclip, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from "@/components/ui/use-toast"
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import UserDisplay from '../../components/UserDisplay'
 
 interface Translation {
