@@ -28,30 +28,9 @@ import { usePresence } from '../hooks/usePresence'
 import SearchModal from './SearchModal'
 import UserDisplay from './UserDisplay'
 import { TourPopup } from './TourPopup'
-
-interface Channel {
-  id: string
-  name: string
-  is_member?: boolean
-}
-
-interface DirectMessage {
-  conversation_id: string
-  type: 'dm' | 'group'
-  name: string | null
-  participants: {
-    id: string
-    email: string
-    display_name?: string
-  }[]
-  unread_count?: number
-}
-
-interface Post {
-  id: string
-  content: string
-  channel_id: string
-}
+import type { Channel } from '@/app/types/entities/Channel'
+import type { DirectMessage } from '@/app/types/entities/DirectMessage'
+import type { Post } from '@/app/types/entities/Post'
 
 export default function Sidebar() {
   const [channels, setChannels] = useState<Channel[]>([])

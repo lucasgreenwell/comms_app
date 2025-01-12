@@ -14,64 +14,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-
-interface File {
-  id: string;
-  file_name: string;
-  file_type: string;
-  file_size: number;
-  path: string;
-}
-
-interface User {
-  id: string;
-  email?: string;
-  display_name?: string | null;
-  native_language?: string | null;
-}
-
-interface EmojiReaction {
-  id: string;
-  emoji: string;
-  user_id: string;
-  created_at: string;
-}
-
-interface Translation {
-  id: string;
-  message_id: string | null;
-  conversation_thread_comment_id: string | null;
-  post_id: string | null;
-  post_thread_comment_id: string | null;
-  mandarin_chinese_translation: string | null;
-  spanish_translation: string | null;
-  english_translation: string | null;
-  hindi_translation: string | null;
-  arabic_translation: string | null;
-  bengali_translation: string | null;
-  portuguese_translation: string | null;
-  russian_translation: string | null;
-  japanese_translation: string | null;
-  western_punjabi_translation: string | null;
-}
-
-interface MessageDisplayProps {
-  id: string;
-  content: string;
-  user: User;
-  files?: File[];
-  currentUser: User | null;
-  onlineUsers?: Set<string>;
-  messageType: 'post' | 'post_thread' | 'dm' | 'dm_thread';
-  threadCount?: number;
-  onThreadOpen?: (message: any) => void;
-  onUpdate: (content: string) => void;
-  tableName: string;
-  className?: string;
-  hideActions?: boolean;
-  translation?: Translation | null;
-  created_at: string;
-}
+import type { MessageDisplayProps } from '@/app/types/props/MessageDisplayProps'
+import type { File } from '@/app/types/entities/File'
+import type { EmojiReaction } from '@/app/types/entities/EmojiReaction'
+import type { User } from '@/app/types/entities/User'
+import type { Translation } from '@/app/types/entities/Translation'
 
 export default function MessageDisplay({
   id,

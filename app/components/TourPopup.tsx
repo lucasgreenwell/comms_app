@@ -1,16 +1,6 @@
 import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-
-interface TourPopupProps {
-  title: string
-  content: string
-  onClose: () => void
-  position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'center-right'
-  onNext?: () => void
-  isLastStep?: boolean
-  currentStep?: number
-  totalSteps?: number
-}
+import type { TourPopupProps } from '@/app/types/props/TourPopupProps'
 
 export function TourPopup({ 
   title, 

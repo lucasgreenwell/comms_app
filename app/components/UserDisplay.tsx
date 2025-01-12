@@ -4,18 +4,7 @@ import { getSupabase } from '../auth';
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useUser } from '../hooks/useUser';
-
-interface UserDisplayProps {
-  user: {
-    id: string;
-    email?: string;
-    display_name?: string | null;
-  };
-  showPresence?: boolean;
-  isOnline?: boolean;
-  className?: string;
-  sidebarColor?: string;
-}
+import type { UserDisplayProps } from '@/app/types/props/UserDisplayProps';
 
 export default function UserDisplay({ 
   user, 
