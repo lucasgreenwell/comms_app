@@ -31,6 +31,12 @@ app/channel/
    - Translation service processes the post
    - Users receive translation updates via subscription
 
+### File Upload Flow
+1. User selects files through the UI
+2. Files are uploaded to Supabase storage
+3. File records are created in the `files` table
+4. File attachments are linked to posts/comments
+
 ### Post Emoji Reaction Flow
 1. User clicks emoji reaction button
 2. Frontend:
@@ -379,13 +385,6 @@ The application uses Supabase's real-time functionality for:
 2. File attachment changes
 3. Translation updates
 4. Thread comment synchronization
-
-## File Upload Flow
-
-1. User selects files through the UI
-2. Files are uploaded to Supabase storage
-3. File records are created in the `files` table
-4. File attachments are linked to posts/comments
 
 ## Request/Response Formats
 
