@@ -475,7 +475,7 @@ export default function Sidebar() {
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
-    <aside className={`min-w-[15vw] ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
+    <aside className={`min-w-[15vw] max-w-[15vw] ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Channels</h2>
         <Button 
@@ -488,99 +488,104 @@ export default function Sidebar() {
         </Button>
       </div>
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
-      <ul className="mb-2 overflow-y-auto max-h-[150px]">
-        {loadingChannels ? (
-          <div className="p-2 text-sm text-gray-500">Loading channels...</div>
-        ) : (
-          channels.map((channel) => (
-            <li key={channel.id} className="mb-2">
-              <Link 
-                href={`/channel/${channel.id}?tourStep=${tourStep}`} 
-                className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
+      
+      {/* Channels section */}
+      <div className="flex-shrink-0">
+        <ul className="mb-2 overflow-y-auto max-h-[30vh]">
+          {loadingChannels ? (
+            <div className="p-2 text-sm text-gray-500">Loading channels...</div>
+          ) : (
+            channels.map((channel) => (
+              <li key={channel.id} className="mb-2">
+                <Link 
+                  href={`/channel/${channel.id}?tourStep=${tourStep}`} 
+                  className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80`}
+                >
+                  <span className="text-sm truncate block"># {channel.name}</span>
+                </Link>
+              </li>
+            ))
+          )}
+        </ul>
+
+        <div className="space-y-1 border-t pt-2">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80"
+            onClick={() => setShowAllChannels(!showAllChannels)}
+          >
+            {showAllChannels ? '↓ Hide Channels' : '→ Show All Channels'}
+          </Button>
+
+          {showAllChannels && (
+            <ul className="py-1 max-h-[20vh] overflow-y-auto">
+              {allChannels
+                .filter(channel => !channel.is_member)
+                .map((channel) => (
+                  <li key={channel.id} className="flex items-center px-2 h-8">
+                    <span className="flex-1 text-sm truncate"># {channel.name}</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleJoinChannel(channel.id)}
+                            className="h-4 w-4 p-0 flex-shrink-0"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Join this channel</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className={`w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80 ${
+                  tourStep === 1 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
+                } transition-all duration-300`}
               >
-                <span className="text-sm"># {channel.name}</span>
-              </Link>
-            </li>
-          ))
-        )}
-      </ul>
-
-      <div className="space-y-1 border-t pt-2">
-        <Button 
-          variant="ghost" 
-          className="w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80"
-          onClick={() => setShowAllChannels(!showAllChannels)}
-        >
-          {showAllChannels ? '↓ Hide Channels' : '→ Show All Channels'}
-        </Button>
-
-        {showAllChannels && (
-          <ul className="py-1">
-            {allChannels
-              .filter(channel => !channel.is_member)
-              .map((channel) => (
-                <li key={channel.id} className="flex items-center px-2 h-8">
-                  <span className="flex-1 text-sm"># {channel.name}</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleJoinChannel(channel.id)}
-                          className="h-4 w-4 p-0"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Join this channel</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </li>
-              ))}
-          </ul>
-        )}
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className={`w-full justify-start text-sm font-normal h-8 px-2 hover:bg-opacity-80 ${
-                tourStep === 1 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
-              } transition-all duration-300`}
-            >
-              + Create Channel
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create a new channel</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreateChannel}>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={newChannelName}
-                    onChange={(e) => setNewChannelName(e.target.value)}
-                    className="col-span-3"
-                  />
+                + Create Channel
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create a new channel</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreateChannel}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">
+                      Name
+                    </Label>
+                    <Input
+                      id="name"
+                      value={newChannelName}
+                      onChange={(e) => setNewChannelName(e.target.value)}
+                      className="col-span-3"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="flex justify-end">
-                <Button type="submit">Create Channel</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex justify-end">
+                  <Button type="submit">Create Channel</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      <div className="border-t pt-2 mt-8 flex-1 flex flex-col">
+      {/* Direct Messages section */}
+      <div className="flex-1 border-t pt-2 mt-8 min-h-0 flex flex-col">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Direct Messages</h2>
           <button
@@ -590,7 +595,7 @@ export default function Sidebar() {
             <Plus className="h-5 w-5" />
           </button>
         </div>
-        <ul className="mb-2 overflow-y-auto flex-1">
+        <ul className="overflow-y-auto flex-1">
           {loadingDMs ? (
             <div className="p-2 text-sm text-gray-500">Loading messages...</div>
           ) : (
@@ -600,22 +605,24 @@ export default function Sidebar() {
                   href={`/dm/${dm.conversation_id}`} 
                   className={`block p-2 rounded ${theme.colors.accent} transition-colors hover:bg-opacity-80 relative`}
                 >
-                  <div className="flex items-center">
+                  <div className="flex items-center pr-6">
                     {dm.type === 'group' ? (
-                      <div>
-                        <span className="text-sm font-medium">{dm.name || 'Group Chat With'}</span>
-                        <div className="text-xs">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-sm font-medium block truncate">{dm.name || 'Group Chat With'}</span>
+                        <div className="text-xs truncate">
                           {dm.participants.map(p => p.display_name || p.email).join(', ')}
                         </div>
                       </div>
                     ) : (
-                      <UserDisplay 
-                        user={dm.participants[0]}
-                        isOnline={onlineUsers.has(dm.participants[0]?.id)}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <UserDisplay 
+                          user={dm.participants[0]}
+                          isOnline={onlineUsers.has(dm.participants[0]?.id)}
+                        />
+                      </div>
                     )}
                     {unreadCounts[dm.conversation_id] > 0 && (
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
                         {unreadCounts[dm.conversation_id]}
                       </div>
                     )}
@@ -627,21 +634,18 @@ export default function Sidebar() {
         </ul>
       </div>
 
-      <StartChatModal
-        isOpen={isStartChatOpen}
-        onClose={() => setIsStartChatOpen(false)}
-      />
-
-      <Link href="/profile">
-        <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2 mb-1">
-          <User className="mr-2 h-4 w-4" />
-          Profile
+      <div className="flex-shrink-0 mt-auto pt-2">
+        <Link href="/profile">
+          <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2 mb-1">
+            <User className="mr-2 h-4 w-4" />
+            Profile
+          </Button>
+        </Link>
+        <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
         </Button>
-      </Link>
-      <Button variant="ghost" className="w-full flex items-center justify-start text-sm font-normal h-8 px-2" onClick={handleLogout}>
-        <LogOut className="mr-2 h-4 w-4" />
-        Logout
-      </Button>
+      </div>
 
       {showTour && getTourContent() && tourStep !== 5 && (
         <TourPopup

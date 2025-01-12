@@ -4,6 +4,5 @@
   "/profile/signup/page": "app/profile/signup/page.js",
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
   "/dm/[id]/page": "app/dm/[id]/page.js",
-  "/api/posts/route": "app/api/posts/route.js",
-  "/page": "app/page.js"
+  "/api/posts/route": "app/api/posts/route.js"
 }
