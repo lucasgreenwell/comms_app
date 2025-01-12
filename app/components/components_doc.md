@@ -177,6 +177,51 @@ channel.on(
 )
 ```
 
+3. Channel Membership Updates
+```typescript
+channel.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'channel_members'
+  },
+  () => {
+    fetchChannels()
+  }
+)
+```
+
+4. New Conversations and Participants
+```typescript
+// New conversations
+channel.on(
+  'postgres_changes',
+  {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'conversations'
+  },
+  () => {
+    fetchDirectMessages()
+  }
+)
+
+// New conversation participants
+channel.on(
+  'postgres_changes',
+  {
+    event: 'INSERT',
+    schema: 'public',
+    table: 'conversation_participants',
+    filter: `user_id=eq.${userId}`
+  },
+  () => {
+    fetchDirectMessages()
+  }
+)
+```
+
 ## Error Handling
 
 Components implement error handling for:

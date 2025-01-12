@@ -120,9 +120,42 @@ export default function Sidebar() {
       )
       .subscribe()
 
+    // Add subscription for new conversations
+    const conversationsChannel = supabase
+      .channel('new_conversations')
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          fetchDirectMessages()
+        }
+      )
+      .subscribe()
+
+    // Add subscription for new conversation participants
+    const participantsChannel = supabase
+      .channel('new_participants')
+      .on('postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversation_participants',
+          filter: currentUser ? `user_id=eq.${currentUser.id}` : undefined
+        },
+        () => {
+          fetchDirectMessages()
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
       supabase.removeChannel(dmChannel)
+      supabase.removeChannel(conversationsChannel)
+      supabase.removeChannel(participantsChannel)
     }
   }, [])
 
@@ -361,14 +394,50 @@ export default function Sidebar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('No user found')
 
+      interface PostResponse {
+        id: string
+        content: string
+        channel_id: string
+        user_id: string
+        created_at: string
+        user: {
+          id: string
+          email: string
+          display_name: string | null
+        }
+      }
+
       const { data: posts, error } = await supabase
         .from('posts')
-        .select('id, content, channel_id')
+        .select(`
+          id,
+          content,
+          channel_id,
+          user_id,
+          created_at,
+          user:users!user_id(id, email, display_name)
+        `)
         .ilike('content', `%${searchQuery}%`)
         .in('channel_id', channels.map(c => c.id))
+        .returns<PostResponse[]>()
 
       if (error) throw error
-      setSearchResults(posts || [])
+      
+      // Transform the data to match Post type
+      const transformedPosts: Post[] = (posts || []).map(post => ({
+        id: post.id,
+        content: post.content,
+        channel_id: post.channel_id,
+        user_id: post.user_id,
+        created_at: post.created_at,
+        user: {
+          id: post.user.id,
+          email: post.user.email,
+          display_name: post.user.display_name
+        }
+      }))
+      
+      setSearchResults(transformedPosts)
     } catch (error) {
       console.error('Error searching posts:', error)
       setError('Failed to search posts')
