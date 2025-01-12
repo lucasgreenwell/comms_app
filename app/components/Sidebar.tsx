@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import StartChatModal from './StartChatModal'
+import StartChatModal from '../dm/StartChatModal'
 import { usePresence } from '../hooks/usePresence'
 import SearchModal from './SearchModal'
 import UserDisplay from './UserDisplay'

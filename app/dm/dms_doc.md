@@ -10,7 +10,8 @@ app/dm/
 │   └── page.tsx                      # Main DM conversation page component
 ├── MessageItem.tsx                   # Individual message component
 ├── ConversationThreadComments.tsx    # Thread discussion component
-└── ConversationThreadCommentItem.tsx # Individual thread comment component
+├── ConversationThreadCommentItem.tsx # Individual thread comment component
+└── StartChatModal.tsx               # Modal for starting new conversations
 ```
 
 ## User Interaction Flows
@@ -169,6 +170,42 @@ interface ThreadComment {
   }[]
 }
 ```
+
+### 4. StartChatModal Component (`StartChatModal.tsx`)
+
+#### Purpose
+Provides a modal interface for users to start new direct message conversations or group chats.
+
+#### Key Features
+- User selection with search functionality
+- Support for both one-on-one and group chats
+- Online presence indicators
+- Pre-selected user support
+- Theme-aware styling
+- Keyboard navigation (Escape to close)
+
+#### Component Interface
+```typescript
+interface StartChatModalProps {
+  isOpen: boolean
+  onClose: () => void
+  preselectedUserId?: string
+  customHeader?: string
+  showStartChatAnimation?: boolean
+}
+```
+
+#### Key Functions
+1. `fetchUsers()`
+   - Retrieves list of available users for chat
+   - Excludes current user from results
+   - Orders users by email
+
+2. `handleStartChat()`
+   - Checks for existing conversations
+   - Creates new conversation if none exists
+   - Handles both DM and group chat creation
+   - Manages participant relationships
 
 ## Database Schema
 

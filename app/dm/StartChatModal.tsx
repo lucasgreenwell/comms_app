@@ -1,12 +1,10 @@
-'use client'
-
 import { useState, useEffect } from 'react'
 import { getSupabase } from '../auth'
 import { X } from 'lucide-react'
 import { themes } from '../config/themes'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/use-toast'
-import UserDisplay from './UserDisplay'
+import UserDisplay from '../components/UserDisplay'
 import { usePresence } from '../hooks/usePresence'
 
 interface User {
