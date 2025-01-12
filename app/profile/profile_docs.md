@@ -1,15 +1,58 @@
 # Profile Directory Documentation
 
 ## Overview
-The profile directory contains components and functionality for managing user profiles in the Slack clone application. It handles user settings like display names, profile pictures, theme preferences, and language settings. The profile page provides a centralized location for users to customize their experience and manage their identity within the application.
+The profile directory contains components and functionality for managing user profiles and authentication in the Slack clone application. It handles user registration, login, profile settings like display names, profile pictures, theme preferences, and language settings. The profile section provides a centralized location for users to manage their identity and customize their experience within the application.
 
 ## Directory Structure
 ```
 app/profile/
 ├── page.tsx              # Main profile settings page component
+├── login/
+│   └── page.tsx         # User login page component
+└── signup/
+    └── page.tsx         # User registration page component
+```
+
+## Types
+
+### User Types
+```typescript
+interface ExtendedUser extends User {
+  display_name?: string | null
+  native_language?: string | null
+}
+
+interface Language {
+  id: string
+  language: string
+}
+
+interface AuthError {
+  message: string
+}
 ```
 
 ## User Interaction Flows
+
+### Authentication Flow
+1. User Registration (Signup)
+   - User enters email and password
+   - Frontend submits to Supabase Auth
+   - Confirmation email is sent
+   - User is redirected to login page
+2. Login
+   - User enters credentials
+   - Frontend authenticates with Supabase
+   - Session is created and stored
+   - User is redirected to main application
+3. Email Confirmation
+   - User clicks confirmation link
+   - Email is verified
+   - User can now log in
+4. Password Reset
+   - User requests password reset
+   - Reset email is sent
+   - User sets new password
 
 ### Profile Picture Upload Flow
 1. User selects an image file through the UI
@@ -49,27 +92,51 @@ app/profile/
    - Reloads page to apply theme
 3. Theme persists across sessions
 
-## TypeScript Types
+## Components
 
-### ExtendedUser Interface
-```typescript
-interface ExtendedUser extends User {
-  display_name?: string | null;
-  native_language?: string | null;
-}
-```
+### LoginPage Component (`login.tsx`)
 
-### Language Interface
-```typescript
-interface Language {
-  id: string;
-  language: string;
-}
-```
+#### Purpose
+Handles user authentication and login functionality.
 
-## UI Components
+#### Key Features
+- Email/password authentication
+- Error handling and display
+- Loading states
+- Email confirmation handling
+- Navigation to signup
 
-### ProfilePage Component
+#### Key Functions
+1. `handleLogin()`
+   - Manages login process with Supabase
+   - Handles authentication errors
+   - Updates session state
+
+2. `handleResendConfirmation()`
+   - Resends confirmation email
+   - Handles error states
+   - Shows success/error notifications
+
+### SignupPage Component (`signup.tsx`)
+
+#### Purpose
+Manages new user registration process.
+
+#### Key Features
+- User registration form
+- Input validation
+- Error handling
+- Success notifications
+- Redirect to login
+
+#### Key Functions
+1. `handleSignup()`
+   - Creates new user account
+   - Triggers confirmation email
+   - Handles registration errors
+   - Redirects to login page
+
+### ProfilePage Component (`page.tsx`)
 Main component for profile settings management.
 
 #### State Management
@@ -103,30 +170,24 @@ const [selectedLanguage, setSelectedLanguage] = useState<string>('')
    - Updates theme preference in localStorage
    - Triggers page reload to apply theme
 
-### UI Components Used
-- Avatar (from @/components/ui/avatar)
-- Button (from @/components/ui/button)
-- Card (from @/components/ui/card)
-- Input (from @/components/ui/input)
-- RadioGroup (from @/components/ui/radio-group)
-- Select (from @/components/ui/select)
-
 ## Database Schema
 
 ### users Table
 ```sql
 CREATE TABLE users (
     id UUID PRIMARY KEY,
-    email TEXT,
+    email TEXT UNIQUE NOT NULL,
     display_name TEXT,
-    native_language UUID REFERENCES top_languages(id)
+    native_language UUID REFERENCES top_languages(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_sign_in_at TIMESTAMPTZ
 );
 ```
 
 ### user_profiles Table
 ```sql
 CREATE TABLE user_profiles (
-    id UUID PRIMARY KEY,
+    id UUID PRIMARY KEY REFERENCES users(id),
     profile_pic_url TEXT
 );
 ```
@@ -140,14 +201,56 @@ CREATE TABLE top_languages (
 );
 ```
 
-## Realtime Features
-The profile page does not currently implement any Supabase real-time subscriptions.
-
 ## API Request/Response Formats
 
-### Fetch User Data
+### Authentication Operations
+
+#### Sign Up
 ```typescript
-// Direct Supabase Query
+const { data, error } = await supabase.auth.signUp({
+  email: string,
+  password: string
+})
+
+// Response
+{
+  data: {
+    user: User | null,
+    session: Session | null
+  },
+  error: AuthError | null
+}
+```
+
+#### Sign In
+```typescript
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: string,
+  password: string
+})
+
+// Response
+{
+  data: {
+    user: User | null,
+    session: Session | null
+  },
+  error: AuthError | null
+}
+```
+
+#### Resend Confirmation
+```typescript
+const { error } = await supabase.auth.resend({
+  type: 'signup',
+  email: string
+})
+```
+
+### Profile Operations
+
+#### Fetch User Data
+```typescript
 const { data: userData, error } = await supabase
   .from('users')
   .select('*')
@@ -156,32 +259,30 @@ const { data: userData, error } = await supabase
 
 // Response Format
 {
-  id: string;
-  email: string;
-  display_name: string | null;
-  native_language: string | null;
+  id: string
+  email: string
+  display_name: string | null
+  native_language: string | null
 }
 ```
 
-### Update Display Name
+#### Update Display Name
 ```typescript
-// Direct Supabase Query
 const { error } = await supabase
   .from('users')
   .update({ display_name: string })
   .eq('id', userId)
 ```
 
-### Update Language Preference
+#### Update Language Preference
 ```typescript
-// Direct Supabase Query
 const { error } = await supabase
   .from('users')
   .update({ native_language: string })
   .eq('id', userId)
 ```
 
-### Upload Profile Picture
+#### Upload Profile Picture
 ```typescript
 // Storage Upload
 const { error: uploadError } = await supabase.storage
@@ -197,9 +298,8 @@ const { error: updateError } = await supabase
   })
 ```
 
-### Fetch Languages
+#### Fetch Languages
 ```typescript
-// Direct Supabase Query
 const { data, error } = await supabase
   .from('top_languages')
   .select('*')
@@ -207,8 +307,20 @@ const { data, error } = await supabase
 
 // Response Format
 Array<{
-  id: string;
-  language: string;
-  code: string;
+  id: string
+  language: string
+  code: string
 }>
-``` 
+```
+
+## Error Handling
+
+The application implements comprehensive error handling for:
+- Authentication failures
+- Email confirmation issues
+- Profile update errors
+- File upload errors
+- Network issues
+- Invalid input validation
+
+Each error is caught and displayed to the user via toast notifications with appropriate error messages and, where applicable, action buttons (like resend confirmation email). 

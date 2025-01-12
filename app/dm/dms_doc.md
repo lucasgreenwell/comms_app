@@ -14,6 +14,97 @@ app/dm/
 └── StartChatModal.tsx               # Modal for starting new conversations
 ```
 
+## Types
+
+### User Types
+```typescript
+interface User {
+  id: string
+  email: string
+  display_name?: string | null
+}
+
+interface Participant {
+  id: string
+  email: string
+  display_name?: string | null
+}
+```
+
+### Message Types
+```typescript
+interface Message {
+  id: string
+  content: string
+  created_at: string
+  sender: {
+    id: string
+    email: string
+    display_name?: string | null
+  }
+  files?: FileAttachment[]
+  translation: Translation | null
+}
+
+interface FileAttachment {
+  id: string
+  file_name: string
+  file_type: string
+  file_size: number
+  path: string
+}
+```
+
+### Thread Types
+```typescript
+interface ThreadComment {
+  id: string
+  user_id: string
+  message_id: string
+  conversation_id: string
+  content: string
+  created_at: string
+  user: {
+    id: string
+    email: string
+    display_name?: string | null
+  }
+  files?: FileAttachment[]
+}
+```
+
+### Translation Types
+```typescript
+interface Translation {
+  id: string
+  message_id: string | null
+  conversation_thread_comment_id: string | null
+  post_id: string | null
+  post_thread_comment_id: string | null
+  mandarin_chinese_translation: string | null
+  spanish_translation: string | null
+  english_translation: string | null
+  hindi_translation: string | null
+  arabic_translation: string | null
+  bengali_translation: string | null
+  portuguese_translation: string | null
+  russian_translation: string | null
+  japanese_translation: string | null
+  western_punjabi_translation: string | null
+}
+```
+
+### Component Props Types
+```typescript
+interface StartChatModalProps {
+  isOpen: boolean
+  onClose: () => void
+  preselectedUserId?: string
+  customHeader?: string
+  showStartChatAnimation?: boolean
+}
+```
+
 ## User Interaction Flows
 
 ### Message Creation Flow
@@ -71,37 +162,7 @@ Main component for displaying and managing direct message conversations.
 - Read receipts
 - Message translations
 
-#### Key Components and Functions
-
-##### State Management
-```typescript
-interface Message {
-  id: string
-  content: string
-  created_at: string
-  sender: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-  translation: Translation | null
-}
-
-// Main state variables
-const [messages, setMessages] = useState<Message[]>([])
-const [conversation, setConversation] = useState<Conversation | null>(null)
-const [participants, setParticipants] = useState<Participant[]>([])
-const [activeThread, setActiveThread] = useState<{...} | null>(null)
-```
-
-##### Key Functions
+#### Key Functions
 1. `sendMessage(e: React.FormEvent)`
    - Handles message submission
    - Manages file uploads
@@ -147,30 +208,6 @@ Renders individual comments within a thread discussion.
 - Translation support
 - Online user status integration
 
-#### Component Interface
-```typescript
-interface ThreadComment {
-  id: string
-  user_id: string
-  message_id: string
-  conversation_id: string
-  content: string
-  created_at: string
-  user: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-}
-```
-
 ### 4. StartChatModal Component (`StartChatModal.tsx`)
 
 #### Purpose
@@ -183,17 +220,6 @@ Provides a modal interface for users to start new direct message conversations o
 - Pre-selected user support
 - Theme-aware styling
 - Keyboard navigation (Escape to close)
-
-#### Component Interface
-```typescript
-interface StartChatModalProps {
-  isOpen: boolean
-  onClose: () => void
-  preselectedUserId?: string
-  customHeader?: string
-  showStartChatAnimation?: boolean
-}
-```
 
 #### Key Functions
 1. `fetchUsers()`
@@ -376,23 +402,7 @@ const { data, error } = await supabase
 ```typescript
 GET /api/conversation-thread-comments?messageId={messageId}
 
-Response: {
-  id: string
-  content: string
-  created_at: string
-  user: {
-    id: string
-    email: string
-    display_name?: string
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-}[]
+Response: ThreadComment[]
 ```
 
 #### Create Thread Comment
@@ -423,71 +433,3 @@ The application implements comprehensive error handling for:
 - Real-time subscription failures
 
 Each error is caught and displayed to the user via toast notifications. 
-
-## Type Definitions
-
-### Translation Type
-```typescript
-interface Translation {
-  id: string;
-  message_id: string | null;
-  conversation_thread_comment_id: string | null;
-  post_id: string | null;
-  post_thread_comment_id: string | null;
-  mandarin_chinese_translation: string | null;
-  spanish_translation: string | null;
-  english_translation: string | null;
-  hindi_translation: string | null;
-  arabic_translation: string | null;
-  bengali_translation: string | null;
-  portuguese_translation: string | null;
-  russian_translation: string | null;
-  japanese_translation: string | null;
-  western_punjabi_translation: string | null;
-}
-```
-
-### Message Type
-```typescript
-interface Message {
-  id: string;
-  content: string;
-  created_at: string;
-  sender: {
-    id: string;
-    email: string;
-    display_name?: string | null;
-  };
-  files?: {
-    id: string;
-    file_name: string;
-    file_type: string;
-    file_size: number;
-    path: string;
-  }[];
-  translation: Translation | null;
-}
-```
-
-### Thread Comment Type
-```typescript
-interface ThreadComment {
-  id: string;
-  user_id: string;
-  message_id: string;
-  conversation_id: string;
-  content: string;
-  created_at: string;
-  user: {
-    id: string;
-    email: string;
-    display_name?: string | null;
-  };
-  files?: {
-    id: string;
-    file_name: string;
-    file_type: string;
-    file_size: number;
-    path: string;
-  }[];
-} 

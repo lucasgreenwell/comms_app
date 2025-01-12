@@ -7,6 +7,7 @@ import Sidebar from './components/Sidebar'
 import { getSupabase } from './auth'
 import { Notification } from './components/Notification'
 import { useUser } from './hooks/useUser'
+import './globals.css'
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: isLoading, fetchUser } = useUser()
@@ -31,11 +32,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           return
         }
 
-        if (pathname === '/login' || pathname === '/signup') {
+        if (pathname === '/profile/login' || pathname === '/profile/signup') {
           router.replace('/')
         }
-      } else if (!pathname?.startsWith('/login') && !pathname?.startsWith('/signup')) {
-        router.replace('/login')
+      } else if (!pathname?.startsWith('/profile/login') && !pathname?.startsWith('/profile/signup')) {
+        router.replace('/profile/login')
       }
     })
 
@@ -55,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }
 
   // Don't show sidebar on login/signup pages
-  if (pathname === '/login' || pathname === '/signup') {
+  if (pathname === '/profile/login' || pathname === '/profile/signup') {
     return (
       <html lang="en">
         <body>
@@ -70,7 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Notification />
-        <SidebarProvider >
+        <SidebarProvider>
           <div className="flex h-screen">
             {user && <Sidebar />}
             <main className="flex-1 overflow-auto min-w-[85vw]">
@@ -82,5 +83,3 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   )
 }
-
-import './globals.css'

@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { getSupabase } from '../auth'
+import { getSupabase } from '@/app/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Notification } from '../components/Notification'
+import { Notification } from '@/app/components/Notification'
 import toast from 'react-hot-toast'
 
-export default function Login() {
+export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -30,25 +30,25 @@ export default function Login() {
 
     try {
       console.log('🔑 Login - Calling signInWithPassword')
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       console.log('🔑 Login - Sign in response:', {
         success: !!data?.session,
-        error: error?.message,
+        error: signInError?.message,
         timestamp: new Date().toISOString()
       })
 
-      if (error) throw error
+      if (signInError) throw signInError
 
       if (data?.session) {
         console.log('🔑 Login - Session obtained, let the layout handle redirect')
         // Deliberately do not force redirect here;
         // RootLayout will see the session and router.replace('/')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('🔑 Login - Error during login:', {
         error: error.message,
         timestamp: new Date().toISOString()
@@ -68,14 +68,14 @@ export default function Login() {
     })
 
     try {
-      const { error } = await supabase.auth.resend({
+      const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email: email,
       })
-      if (error) throw error
+      if (resendError) throw resendError
       toast.success('Confirmation email resent. Please check your inbox.')
       console.log('🔑 Login - Confirmation email resent successfully')
-    } catch (error) {
+    } catch (error: any) {
       console.error('🔑 Login - Error resending confirmation:', {
         error: error.message,
         timestamp: new Date().toISOString()
@@ -136,10 +136,9 @@ export default function Login() {
           </Button>
         </form>
         <p className="mt-4 text-center">
-          Don't have an account? <Link href="/signup" className="text-blue-500 hover:underline">Sign up</Link>
+          Don't have an account? <Link href="/profile/signup" className="text-blue-500 hover:underline">Sign up</Link>
         </p>
       </div>
     </div>
   )
-}
-
+} 
