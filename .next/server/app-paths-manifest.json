@@ -3,6 +3,5 @@
   "/login/page": "app/login/page.js",
   "/profile/page": "app/profile/page.js",
   "/dm/[id]/page": "app/dm/[id]/page.js",
-  "/page": "app/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/signup/page": "app/signup/page.js"
 }
