@@ -10,6 +10,7 @@ app/components/
 ├── Notification.tsx        # Toast notification component
 ├── SearchModal.tsx         # Global search modal component
 ├── Sidebar.tsx            # Main navigation sidebar component
+├── StartChatModal.tsx     # Modal for starting new direct messages
 ├── TourPopup.tsx          # Tour guide popup component
 └── UserDisplay.tsx        # User avatar and status display component
 ```
@@ -27,6 +28,7 @@ The type definitions for this feature have been moved to centralized type direct
 
 ### Props Types (`app/types/props/`)
 - `MessageDisplayProps.ts` - Props for MessageDisplay component
+- `StartChatModalProps.ts` - Props for StartChatModal component
 - `TourPopupProps.ts` - Props for TourPopup component
 - `UserDisplayProps.ts` - Props for UserDisplay component
 
@@ -89,6 +91,18 @@ Handles toast notifications throughout the application.
 - Toast notifications
 - Customizable positioning
 - Multiple notification types
+
+### 6. StartChatModal Component (`StartChatModal.tsx`)
+
+#### Purpose
+Modal component for initiating new direct message conversations.
+
+#### Key Features
+- User selection interface
+- Pre-selected user support
+- Custom header text
+- Animation support for tour integration
+- Integration with tour guide functionality
 
 ## Usage Examples
 

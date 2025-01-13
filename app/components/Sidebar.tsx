@@ -53,13 +53,12 @@ export default function Sidebar() {
   const [showAllChannels, setShowAllChannels] = useState(false)
   const [allChannels, setAllChannels] = useState<Channel[]>([])
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([])
-  const [isStartChatOpen, setIsStartChatOpen] = useState(false)
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
   const { onlineUsers } = usePresence()
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [showTour, setShowTour] = useState(false)
   const [tourStep, setTourStep] = useState(1)
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false)
 
   useEffect(() => {
     fetchChannels()
@@ -589,7 +588,7 @@ export default function Sidebar() {
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">Direct Messages</h2>
           <button
-            onClick={() => setIsStartChatOpen(true)}
+            onClick={() => setIsChatModalOpen(true)}
             className="p-1 hover:bg-gray-200 rounded"
           >
             <Plus className="h-5 w-5" />

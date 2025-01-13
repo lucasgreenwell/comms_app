@@ -1,10 +1,25 @@
 {
   "pages": {
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
+    ],
+    "/channel/[channelId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/channel/[channelId]/page.js"
+    ],
+    "/dm/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/dm/[id]/page.js"
     ],
     "/profile/login/page": [
       "static/chunks/webpack.js",
@@ -16,20 +31,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/profile/signup/page.js"
     ],
-    "/page": [
+    "/profile/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/channel/[channelId]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/channel/[channelId]/page.js"
-    ],
-    "/dm/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dm/[id]/page.js"
+      "static/chunks/app/profile/page.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
