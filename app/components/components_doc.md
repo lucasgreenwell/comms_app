@@ -334,3 +334,25 @@ Components implement error handling for:
 - Invalid user input
 
 Each error is caught and displayed via the Notification component. 
+
+### Channel Creation and Joining
+
+#### Channel Creation
+- Users can create new channels by providing a unique channel name.
+- If a channel with the same name already exists, a toast notification will inform the user to choose a different name.
+- The channel creator is automatically added as a member of the new channel.
+
+#### Channel Joining
+- Users can join existing channels by selecting them from the list of available channels.
+- Upon joining, users are added to the channel's member list.
+
+#### Relevant Database Tables
+- **channels**: Stores channel information such as `id`, `name`, and `created_at`.
+- **channel_members**: Manages the relationship between users and channels, tracking which users have joined which channels.
+
+#### TypeScript Types
+- `Channel`: Represents a channel entity with properties like `id` and `name`.
+- `DirectMessage`: Represents a direct message conversation.
+
+#### Error Handling
+- Uses `react-hot-toast` to display error notifications, such as when a channel name is already taken. 

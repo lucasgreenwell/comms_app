@@ -31,6 +31,7 @@ import { TourPopup } from './TourPopup'
 import type { Channel } from '@/app/types/entities/Channel'
 import type { DirectMessage } from '@/app/types/entities/DirectMessage'
 import type { Post } from '@/app/types/entities/Post'
+import { toast } from 'react-hot-toast'
 
 export default function Sidebar() {
   const [channels, setChannels] = useState<Channel[]>([])
@@ -296,7 +297,17 @@ export default function Sidebar() {
         .select()
         .single()
 
-      if (channelError) throw channelError
+      if (channelError) {
+        if (channelError.message.includes('duplicate key value violates unique constraint')) {
+          toast.error('Channel name already exists. Please choose a different name.')
+          setIsDialogOpen(false)
+        } else {
+          console.error('Unexpected error creating channel:', channelError)
+          toast.error('An unexpected error occurred. Please try again later.')
+          setIsDialogOpen(false);
+        }
+        return
+      }
 
       // Add the creator as a member
       const { error: memberError } = await supabase
@@ -310,8 +321,8 @@ export default function Sidebar() {
       await fetchChannels()
       router.push(`/channel/${channelData.id}`) // Navigate to the new channel
     } catch (error) {
-      console.error('Error creating channel:', error)
-      setError('Failed to create channel')
+      setIsDialogOpen(false)
+      toast.error('Failed to create channel. Please try again later.')
     }
   }
 
