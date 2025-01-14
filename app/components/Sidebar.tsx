@@ -579,7 +579,11 @@ export default function Sidebar() {
               {allChannels
                 .filter(channel => !channel.is_member)
                 .map((channel) => (
-                  <li key={channel.id} className="flex items-center px-2 h-8">
+                  <li 
+                    key={channel.id} 
+                    className={`flex items-center px-2 h-8 cursor-pointer ${theme.colors.accent} transition-colors hover:bg-opacity-80 group`}
+                    onClick={() => handleJoinChannel(channel.id)}
+                  >
                     <span className="flex-1 text-sm truncate"># {channel.name}</span>
                     <TooltipProvider>
                       <Tooltip>
@@ -587,8 +591,7 @@ export default function Sidebar() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleJoinChannel(channel.id)}
-                            className="h-4 w-4 p-0 flex-shrink-0"
+                            className="h-4 w-4 p-0 flex-shrink-0 opacity-0 group-hover:opacity-100"
                           >
                             <Plus className="h-4 w-4" />
                           </Button>

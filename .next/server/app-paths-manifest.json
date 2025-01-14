@@ -3,5 +3,6 @@
   "/profile/login/page": "app/profile/login/page.js",
   "/profile/signup/page": "app/profile/signup/page.js",
   "/profile/page": "app/profile/page.js",
-  "/dm/[id]/page": "app/dm/[id]/page.js"
+  "/dm/[id]/page": "app/dm/[id]/page.js",
+  "/page": "app/page.js"
 }
