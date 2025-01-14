@@ -96,240 +96,37 @@
 
 ---
 
-### 8. **presence**
-| Column       | Type         | Description                                  |
-|--------------|-------------|----------------------------------------------|
-| **user_id**  | UUID        | FK to `users.id` (which user)                |
-| **is_online**| BOOLEAN     | Whether the user is currently online         |
-| **last_seen**| TIMESTAMPTZ | Timestamp of last activity or sign-off       |
+### 8. **vector_embeddings**
+| Column                             | Type         | Description                                                             |
+|------------------------------------|--------------|-------------------------------------------------------------------------|
+| **id**                             | UUID         | Primary key                                                             |
+| **message_id**                     | UUID         | FK to `messages.id`, nullable                                           |
+| **post_id**                        | UUID         | FK to `posts.id`, nullable                                              |
+| **conversation_thread_comment_id** | UUID         | FK to `conversation_thread_comments.id`, nullable                       |
+| **post_thread_comment_id**         | UUID         | FK to `post_thread_comments.id`, nullable                               |
+| **created_at**                     | TIMESTAMP    | Default to `NOW()`, record creation time                                |
+| **embedding**                      | vector(3072) | Vector field with 3072 dimensions                                       |
 
 **Notes**:  
-- Tracks the real-time online/offline status of each user.
+- Handles embeddings for various content types (messages, posts, comments).  
+- Includes Row-Level Security (RLS) policies for authenticated access.  
 
----
-
-### 9. **top_languages**
-| Column    | Type | Description                                              |
-|-----------|------|----------------------------------------------------------|
-| **id**    | UUID | Primary key                                              |
-| **language** | TEXT | Human-readable language name (e.g. “English”, “Spanish”) |
-| **code**  | TEXT | Language code (e.g., “en”, “es”)                         |
-
-**Notes**:  
-- May be used to populate user language preferences or references.
-
----
-
-### 10. **translations**
-| Column                              | Type        | Description                                                           |
-|-------------------------------------|------------|-----------------------------------------------------------------------|
-| **id**                              | UUID       | Primary key                                                           |
-| **message_id**                      | UUID       | FK to `messages.id` (nullable)                                        |
-| **post_id**                         | UUID       | FK to `posts.id` (nullable)                                           |
-| **conversation_thread_comment_id**  | UUID       | FK to `conversation_thread_comments.id` (nullable)                    |
-| **post_thread_comment_id**          | UUID       | FK to `post_thread_comments.id` (nullable)                            |
-| **user_id**                         | UUID       | Possibly the owner or creator of these translations (nullable)        |
-| **created_at**                      | TIMESTAMPTZ | Timestamp when the translation was created                            |
-| **mandarin_chinese_translation**    | TEXT       | Translation text                                                      |
-| **spanish_translation**            | TEXT       | Translation text                                                      |
-| **english_translation**            | TEXT       | Translation text                                                      |
-| **hindi_translation**              | TEXT       | Translation text                                                      |
-| **arabic_translation**             | TEXT       | Translation text                                                      |
-| **bengali_translation**            | TEXT       | Translation text                                                      |
-| **portuguese_translation**         | TEXT       | Translation text                                                      |
-| **russian_translation**            | TEXT       | Translation text                                                      |
-| **japanese_translation**           | TEXT       | Translation text                                                      |
-| **western_punjabi_translation**    | TEXT       | Translation text                                                      |
-
-**Notes**:  
-- Centralizes multilingual translations for posts, messages, or comments.  
-- Only one of `message_id`, `post_id`, etc. might be used per row, depending on what content is being translated.
-
----
-
-### 11. **conversations**
-| Column       | Type        | Description                                                                   |
-|--------------|------------|-------------------------------------------------------------------------------|
-| **id**       | UUID       | Primary key                                                                   |
-| **name**     | TEXT       | Conversation name (for group chats, etc.)                                     |
-| **type**     | TEXT       | Could indicate “direct”, “group”, “channel-based”, etc.                       |
-| **created_at** | TIMESTAMPTZ | Timestamp when the conversation was created                                 |
-
-**Notes**:  
-- Used to group messages together.  
-- For direct messages, `type` could be “DM,” and for group, “GROUP,” etc.
-
----
-
-### 12. **conversation_participants**
-| Column             | Type        | Description                                                                |
-|--------------------|------------|----------------------------------------------------------------------------|
-| **conversation_id**| UUID       | FK to `conversations.id`                                                   |
-| **user_id**        | UUID       | FK to `users.id`                                                           |
-| **created_at**     | TIMESTAMPTZ | Timestamp when user joined or was added to the conversation                |
-| **last_read_at**   | TIMESTAMPTZ | (New) Timestamp when the user last read all available messages in the convo|
-
-**Notes**:  
-- Tracks which users are in which conversation.  
-- Often used for direct messages (2 participants) or group chats (multiple participants).  
-- `last_read_at` is used to compute unread messages for each participant.
-
----
-
-### 13. **conversation_participant_keys**
-| Column              | Type        | Description                                                |
-|---------------------|------------|------------------------------------------------------------|
-| **id**             | INT4       | Primary key (integer sequence)                             |
-| **participant_key**| TEXT       | Possibly an encryption or identity key for the participant |
-| **conversation_id**| UUID       | FK to `conversations.id`                                   |
-| **created_at**     | TIMESTAMPTZ | Timestamp of creation                                      |
-
-**Notes**:  
-- Could be used to manage additional security keys or tokens for participants in a conversation.
-
----
-
-### 14. **conversation_thread_comments**
-| Column                | Type        | Description                                                         |
-|-----------------------|------------|---------------------------------------------------------------------|
-| **id**                | UUID       | Primary key                                                         |
-| **conversation_id**   | UUID       | FK to `conversations.id`                                            |
-| **user_id**           | UUID       | FK to `users.id` (the commenter)                                    |
-| **content**           | TEXT       | Comment text                                                        |
-| **created_at**        | TIMESTAMPTZ | Timestamp of comment creation                                       |
-| **message_id**        | UUID       | FK to `messages.id` (if tied to a specific message)                 |
-
-**Notes**:  
-- Allows for threaded replies to messages inside a conversation.
-
----
-
-### 15. **file_attachments**
-| Column                             | Type        | Description                                                            |
-|------------------------------------|------------|------------------------------------------------------------------------|
-| **id**                             | UUID       | Primary key                                                            |
-| **file_id**                        | UUID       | FK to `files.id` (the actual file resource)                            |
-| **message_id**                     | UUID       | FK to `messages.id`                                                    |
-| **post_id**                        | UUID       | FK to `posts.id`                                                       |
-| **conversation_thread_comment_id** | UUID       | FK to `conversation_thread_comments.id`                                 |
-| **post_thread_comment_id**         | UUID       | FK to `post_thread_comments.id`                                        |
-| **created_at**                     | TIMESTAMPTZ | Timestamp of attachment creation                                       |
-
-**Notes**:  
-- Associates a file with one of several possible content items (message, post, or comment).
-
----
-
-### 16. **files**
-| Column       | Type        | Description                                           |
-|--------------|------------|-------------------------------------------------------|
-| **id**       | UUID       | Primary key                                           |
-| **file_name**| TEXT       | Original file name                                    |
-| **file_type**| TEXT       | MIME type or general file type                        |
-| **file_size**| INT8       | File size in bytes                                    |
-| **bucket**   | TEXT       | Storage bucket or location identifier                 |
-| **path**     | TEXT       | File path or key in the bucket                        |
-| **uploaded_by**| UUID     | FK to `users.id` (who uploaded the file)              |
-| **created_at**| TIMESTAMPTZ | Timestamp of file upload                            |
-
-**Notes**:  
-- Manages metadata for uploaded files.
-
----
-
-### 17. **emoji_reactions**
-| Column                             | Type        | Description                                                    |
-|------------------------------------|------------|----------------------------------------------------------------|
-| **id**                             | UUID       | Primary key                                                    |
-| **message_id**                     | UUID       | FK to `messages.id`                                            |
-| **post_id**                        | UUID       | FK to `posts.id`                                               |
-| **conversation_thread_comment_id** | UUID       | FK to `conversation_thread_comments.id`                        |
-| **post_thread_comment_id**         | UUID       | FK to `post_thread_comments.id`                                |
-| **created_at**                     | TIMESTAMPTZ | Timestamp of reaction creation                                 |
-| **user_id**                        | UUID       | FK to `users.id` (who reacted)                                 |
-| **emoji**                          | TEXT       | The emoji or reaction code                                     |
-
-**Notes**:  
-- Allows users to react to messages, posts, or thread comments with emojis.
-
----
-
-### 18. **message_reads** (Optional for Per-Message Read Receipts)
-| Column      | Type        | Description                                                  |
-|-------------|------------|--------------------------------------------------------------|
-| **id**      | UUID       | Primary key (default `gen_random_uuid()`)                    |
-| **message_id** | UUID    | FK to `messages.id`                                          |
-| **user_id** | UUID       | FK to `users.id` (the user who read the message)             |
-| **read_at** | TIMESTAMPTZ | Timestamp when the user read the message                    |
-
-**Notes**:  
-- Only needed if you want fine-grained read receipts.  
-- A unique constraint on `(message_id, user_id)` ensures no duplicates.  
-
----
-
-## Notes
-- Most `id` columns are `UUID` primary keys.  
-- The `created_at` columns are generally `timestamptz` (UTC timestamps).  
-- Many tables include user references (likely `users.id` or possibly `auth.users.id`).  
-- Relationship tables (e.g., **channel_members**, **conversation_participants**) handle many-to-many links.  
-- Some tables (like **translations**, **file_attachments**, **emoji_reactions**) can reference multiple content tables by including columns such as `message_id`, `post_id`, or `comment_id`. Usually only one of those columns is used per record.  
-- We've added `last_read_at` to **conversation_participants** for conversation-level read tracking.  
-- We've optionally created **message_reads** for per-message read receipts if that's needed in the future.
-
-## Row Level Security (RLS) Policies
-
-### Posts Table Policies
+**RLS Policies**:  
 ```sql
--- Enable read access for all users
-CREATE POLICY "Enable read access for all users" 
-ON posts FOR SELECT 
-TO public 
-USING (true);
+ALTER TABLE vector_embeddings ENABLE ROW LEVEL SECURITY;
 
--- Users can delete their own posts
-CREATE POLICY "Users can delete their own posts" 
-ON posts FOR DELETE 
-TO public 
-USING (auth.uid() = user_id);
+CREATE POLICY read_policy ON vector_embeddings
+    FOR SELECT
+    USING (auth.role() = 'authenticated');
 
--- Users can update their own posts
-CREATE POLICY "Users can update their own posts" 
-ON posts FOR UPDATE 
-TO public 
-USING (auth.uid() = user_id) 
-WITH CHECK (auth.uid() = user_id);
+CREATE POLICY insert_policy ON vector_embeddings
+    FOR INSERT
+    WITH CHECK (auth.role() = 'authenticated');
 
--- Users can create posts
-CREATE POLICY "Users can create posts" 
-ON posts FOR INSERT 
-TO public 
-WITH CHECK (auth.uid() = user_id);
-```
+CREATE POLICY update_policy ON vector_embeddings
+    FOR UPDATE
+    USING (auth.role() = 'authenticated');
 
-These policies ensure that:
-1. Anyone can read posts (SELECT)
-2. Only the post author can delete their posts (DELETE)
-3. Only the post author can update their posts (UPDATE)
-4. Only authenticated users can create posts as themselves (INSERT)
-
-## Authentication
-- The `users` table may be linked to the authentication system via `auth.users.id`.  
-- A separate **user_profiles** table extends user data with profile pictures or other info.
-
-## Data Types
-- **UUID**: Universally Unique Identifier  
-- **TEXT**: Variable-length character strings  
-- **BOOLEAN**: True/false values  
-- **INT4** / **INT8**: 4-byte or 8-byte integers (e.g., for IDs or file sizes)  
-- **TIMESTAMPTZ**: Timestamp with time zone (commonly used for tracking creation/updated times)
-
-## Relationships (High-Level)
-1. **Users** can have multiple **posts**, **messages**, **emoji_reactions**, etc.  
-2. **Channels** have many **posts**; users join channels via **channel_members**.  
-3. **Conversations** track multiple **messages**; users join conversations via **conversation_participants**.  
-4. **Thread Comments** exist for both **posts** and **messages** (via `post_thread_comments` and `conversation_thread_comments`).  
-5. **Translations**, **file_attachments**, and **emoji_reactions** can reference any of the post/message/comment tables.  
-6. **message_reads** (if implemented) associates a user and a specific message for detailed read tracking.  
-
----
+CREATE POLICY delete_policy ON vector_embeddings
+    FOR DELETE
+    USING (auth.role() = 'authenticated');
