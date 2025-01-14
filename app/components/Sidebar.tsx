@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { User, LogOut, Plus, MessageSquare, Search } from 'lucide-react'
+import { User, LogOut, Plus, MessageSquare, Search, Sparkles } from 'lucide-react'
 import { themes } from '../config/themes'
 import {
   Tooltip,
@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useToast } from "@/components/ui/use-toast"
 import StartChatModal from '../dm/StartChatModal'
 import { usePresence } from '../hooks/usePresence'
 import SearchModal from './SearchModal'
@@ -60,6 +61,7 @@ export default function Sidebar() {
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [showTour, setShowTour] = useState(false)
   const [tourStep, setTourStep] = useState(1)
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchChannels()
@@ -482,10 +484,55 @@ export default function Sidebar() {
     }
   }
 
+  const handleGlobalBotChat = async () => {
+    const supabase = getSupabase()
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+
+    if (!currentUser) return
+
+    try {
+      const allParticipantIds = [currentUser.id, '54296b9b-091e-4a19-b5b9-b890c24c1912'].sort()
+      const { data: existingConversation, error: lookupError } = await supabase
+        .rpc('find_existing_conversation', {
+          participant_ids: allParticipantIds
+        })
+
+      if (lookupError) throw lookupError
+
+      if (existingConversation) {
+        router.push(`/dm/${existingConversation}`)
+        return
+      }
+
+      const { data: conversationId, error: createError } = await supabase
+        .rpc('create_conversation_with_participants', {
+          p_type: 'dm',
+          p_name: null,
+          p_participant_ids: allParticipantIds
+        })
+
+      if (createError) throw createError
+
+      router.push(`/dm/${conversationId}`)
+    } catch (error) {
+      console.error('Error creating conversation with global bot:', error)
+      toast({
+        title: "Error starting chat",
+        description: "There was an error starting the chat with Global Bot. Please try again.",
+        variant: "destructive"
+      })
+    }
+  }
+
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
     <aside className={`min-w-[15vw] max-w-[15vw] ${theme.colors.background} ${theme.colors.foreground} p-4 flex flex-col h-full`}>
+      <div className={`flex justify-between items-center mb-4 -mx-4 px-4 pb-2 border-b cursor-pointer ${theme.colors.accent} transition-colors hover:bg-opacity-80`} onClick={handleGlobalBotChat}>
+        <h2 className="text-xl font-bold">Global Bot</h2>
+        <Sparkles className="h-5 w-5" />
+      </div>
+
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Channels</h2>
         <Button 
