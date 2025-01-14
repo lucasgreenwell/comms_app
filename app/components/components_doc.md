@@ -47,6 +47,95 @@ Displays individual messages with support for emoji reactions, file attachments,
 - Translation support
 - Thread discussion support
 
+#### Emoji Reaction System
+
+The MessageDisplay component includes a comprehensive emoji reaction system that allows users to react to messages with emojis. This functionality is built on top of the `emoji_reactions` table in the database.
+
+##### Database Integration
+The system uses the following table structure:
+```sql
+emoji_reactions
+- id: UUID (Primary Key)
+- message_id: UUID (FK to messages.id)
+- post_id: UUID (FK to posts.id)
+- conversation_thread_comment_id: UUID (FK to conversation_thread_comments.id)
+- post_thread_comment_id: UUID (FK to post_thread_comments.id)
+- created_at: TIMESTAMPTZ
+- user_id: UUID (FK to users.id)
+- emoji: TEXT
+```
+
+##### Key Functions
+
+1. **Loading Reactions** (`loadReactions`)
+   - Fetches reactions for the current message/post
+   - Handles different message types (post, dm, thread)
+   - Updates local state with fetched reactions
+
+2. **Adding Reactions** (`handleAddReaction`)
+   - Adds new emoji reaction to the database
+   - Updates UI optimistically
+   - Handles error cases with toast notifications
+
+3. **Removing Reactions** (`handleRemoveReaction`)
+   - Removes user's reaction from the database
+   - Updates UI optimistically
+   - Only allows users to remove their own reactions
+
+4. **Real-time Updates**
+   - Subscribes to Supabase real-time changes
+   - Updates reactions instantly when others react
+   - Handles INSERT and DELETE events
+
+##### UI Features
+
+1. **Emoji Picker**
+   - Grid-based emoji selection interface
+   - Pagination support for multiple emoji pages
+   - Accessible via the smile icon button
+
+2. **Reaction Display**
+   - Groups identical reactions together
+   - Shows reaction count
+   - Highlights user's own reactions with theme color
+   - Hover effects for interaction feedback
+
+3. **Theme Integration**
+   - Uses application theme colors
+   - Semi-transparent background for user's reactions
+   - Consistent hover states
+
+##### Usage Example
+```typescript
+// Subscribing to real-time updates
+useEffect(() => {
+  const supabase = getSupabase();
+  const channel = supabase
+    .channel(`reactions:${id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'emoji_reactions',
+        filter: `message_id=eq.${id}`
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setReactions(prev => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setReactions(prev => prev.filter(r => r.id !== payload.old.id));
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [id]);
+```
+
 ### 2. Sidebar Component (`Sidebar.tsx`)
 
 #### Purpose

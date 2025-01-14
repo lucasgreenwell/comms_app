@@ -17,7 +17,6 @@ import {
 import type { MessageDisplayProps } from '@/app/types/props/MessageDisplayProps'
 import type { File } from '@/app/types/entities/File'
 import type { EmojiReaction } from '@/app/types/entities/EmojiReaction'
-import type { User } from '@/app/types/entities/User'
 import type { Translation } from '@/app/types/entities/Translation'
 
 export default function MessageDisplay({
@@ -48,6 +47,7 @@ export default function MessageDisplay({
   });
   const [reactions, setReactions] = useState<EmojiReaction[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
+  const [reactionUsers, setReactionUsers] = useState<Record<string, any>>({});
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -69,6 +69,33 @@ export default function MessageDisplay({
     loadReactions();
   }, [id]);
 
+  useEffect(() => {
+    // Load user data for all reactions
+    const userIds = new Set(reactions.map(r => r.user_id));
+    const loadUserData = async () => {
+      const supabase = getSupabase();
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, display_name, email')
+        .in('id', Array.from(userIds));
+
+      if (error) {
+        console.error('Error loading user data:', error);
+        return;
+      }
+
+      const userMap = data.reduce((acc, user) => {
+        acc[user.id] = user;
+        return acc;
+      }, {} as Record<string, any>);
+
+      setReactionUsers(userMap);
+    };
+
+    if (userIds.size > 0) {
+      loadUserData();
+    }
+  }, [reactions]);
 
   const loadReactions = async () => {
     const supabase = getSupabase();
@@ -539,25 +566,49 @@ export default function MessageDisplay({
           <div className="flex justify-between items-center mt-1">
             {/* Emoji Reactions */}
             <div className="flex flex-wrap gap-1 mt-1">
-              {Object.entries(groupedReactions).map(([emoji, reactions]) => (
-                <Button
-                  key={emoji}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 px-3 py-1 text-sm rounded-full hover:bg-accent"
-                  onClick={() => {
-                    const userReaction = reactions.find(r => r.user_id === currentUser?.id);
-                    if (userReaction) {
-                      handleRemoveReaction(userReaction.id);
-                    } else {
-                      handleAddReaction(emoji);
+              {Object.entries(groupedReactions).map(([emoji, reactions]) => {
+                const hasUserReacted = reactions.some(r => r.user_id === currentUser?.id);
+                // Get just the display names for each user who reacted
+                const reactingUsers = reactions
+                  .map(r => {
+                    if (r.user_id === currentUser?.id) {
+                      return currentUser.display_name || 'You';
                     }
-                  }}
-                >
-                  <span className="mr-1.5 text-base">{emoji}</span>
-                  <span>{reactions.length}</span>
-                </Button>
-              ))}
+                    const user = reactionUsers[r.user_id];
+                    return user?.display_name || user?.email?.split('@')[0] || 'Unknown user';
+                  })
+                  .join(', ');
+                
+                return (
+                  <TooltipProvider key={emoji}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`h-8 px-3 py-1 text-sm rounded-full bg-opacity-25 ${
+                            hasUserReacted ? `${theme.colors.background} bg-opacity-25` : 'hover:bg-accent'
+                          }`}
+                          onClick={() => {
+                            const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                            if (userReaction) {
+                              handleRemoveReaction(userReaction.id);
+                            } else {
+                              handleAddReaction(emoji);
+                            }
+                          }}
+                        >
+                          <span className="mr-1.5 text-base">{emoji}</span>
+                          <span>{reactions.length}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" sideOffset={5} className="p-2 z-[9999]">
+                        <p className="text-sm">{reactingUsers}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
             </div>
           </div>
         </div>
