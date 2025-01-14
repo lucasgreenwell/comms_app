@@ -13,6 +13,41 @@ import { useToast } from "@/components/ui/use-toast"
 import type { Channel } from '@/app/types/entities/Channel'
 import type { Post } from '@/app/types/entities/Post'
 
+type DbPost = {
+  id: string;
+  user_id: string;
+  channel_id: string;
+  content: string;
+  created_at: string;
+  files: {
+    id: string;
+    file: {
+      id: string;
+      file_name: string;
+      file_type: string;
+      file_size: number;
+      path: string;
+    };
+  }[] | null;
+  translations: {
+    id: string;
+    message_id: string | null;
+    conversation_thread_comment_id: string | null;
+    post_id: string | null;
+    post_thread_comment_id: string | null;
+    mandarin_chinese_translation: string | null;
+    spanish_translation: string | null;
+    english_translation: string | null;
+    hindi_translation: string | null;
+    arabic_translation: string | null;
+    bengali_translation: string | null;
+    portuguese_translation: string | null;
+    russian_translation: string | null;
+    japanese_translation: string | null;
+    western_punjabi_translation: string | null;
+  }[] | null;
+}
+
 export default function Channel() {
   const { channelId } = useParams()
   const router = useRouter()
@@ -330,10 +365,95 @@ export default function Channel() {
 
           setPosts(prevPosts => [...prevPosts, newPost])
         } else if (payload.eventType === 'UPDATE') {
-          setPosts(prevPosts => 
-            prevPosts.map(post => 
-              post.id === payload.new.id ? { ...post, ...payload.new } : post
-            )
+          // Fetch the complete post data including files and translations
+          const { data: postData, error: postError } = await supabase
+            .from('posts')
+            .select(`
+              id, 
+              user_id,
+              channel_id,
+              content, 
+              created_at,
+              files:file_attachments(
+                id,
+                file:file_id(
+                  id,
+                  file_name,
+                  file_type,
+                  file_size,
+                  path
+                )
+              ),
+              translations (
+                id,
+                message_id,
+                conversation_thread_comment_id,
+                post_id,
+                post_thread_comment_id,
+                mandarin_chinese_translation,
+                spanish_translation,
+                english_translation,
+                hindi_translation,
+                arabic_translation,
+                bengali_translation,
+                portuguese_translation,
+                russian_translation,
+                japanese_translation,
+                western_punjabi_translation
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (postError) {
+            console.error('Error fetching updated post:', postError)
+            return
+          }
+
+          const post = postData as unknown as DbPost
+
+          // Fetch user data for the post
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, email, display_name, native_language')
+            .eq('id', post.user_id)
+            .single()
+
+          if (userError) {
+            console.error('Error fetching user details:', userError)
+            return
+          }
+
+          // Transform the post data
+          const updatedPost: Post = {
+            id: post.id,
+            user_id: post.user_id,
+            channel_id: post.channel_id,
+            content: post.content,
+            created_at: post.created_at,
+            user: {
+              id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              native_language: user.native_language
+            },
+            files: post.files?.map((f: { file: { id: string; file_name: string; file_type: string; file_size: number; path: string; }; }) => ({
+              id: f.file.id,
+              file_name: f.file.file_name,
+              file_type: f.file.file_type,
+              file_size: f.file.file_size,
+              path: f.file.path
+            })) || [],
+            translation: post.translations?.[0] || null
+          }
+
+          setPosts(prevPosts =>
+            prevPosts.map(p => {
+              if (p.id === payload.new.id) {
+                return updatedPost
+              }
+              return p
+            })
           )
         } else if (payload.eventType === 'DELETE') {
           setPosts(prevPosts => prevPosts.filter(post => post.id !== payload.old?.id))

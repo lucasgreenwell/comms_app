@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import MessageDisplay from '../../components/MessageDisplay'
 import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
-import { Post } from '@/app/types/post'
+import type { Post } from '@/app/types/entities/Post'
 import type { PostItemProps } from '@/app/types/props/PostItemProps'
 
 export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemProps) {
@@ -14,6 +14,10 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
   const { onlineUsers } = usePresence()
   const { user: currentUser } = useUser()
   const [currentPost, setCurrentPost] = useState(post)
+
+  useEffect(() => {
+    setCurrentPost(post)
+  }, [post])
 
   useEffect(() => {
     fetchThreadCount()

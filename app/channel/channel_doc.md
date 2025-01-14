@@ -606,8 +606,47 @@ channel.on('postgres_changes',
 
       // Transform and add to state
       setPosts(prevPosts => [...prevPosts, transformedPost])
+    } else if (payload.eventType === 'UPDATE') {
+      // For updates, we need to fetch the complete post data again
+      // This ensures we have all related data (files, translations, etc.)
+      const { data: post } = await supabase
+        .from('posts')
+        .select(`
+          id, 
+          user_id,
+          channel_id,
+          content, 
+          created_at,
+          files:file_attachments(
+            id,
+            file:file_id(
+              id,
+              file_name,
+              file_type,
+              file_size,
+              path
+            )
+          ),
+          translations(*)
+        `)
+        .eq('id', payload.new.id)
+        .single()
+
+      // Fetch user data
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, email, display_name, native_language')
+        .eq('id', post.user_id)
+        .single()
+
+      // Transform and update the specific post
+      setPosts(prevPosts =>
+        prevPosts.map(p =>
+          p.id === payload.new.id ? transformedPost : p
+        )
+      )
     }
-    // Handle UPDATE and DELETE...
+    // Handle DELETE...
   }
 )
 
@@ -709,16 +748,19 @@ channel.on('postgres_changes',
 
 ### Real-time Data Flow
 
-#### New Post Creation
-1. User creates a post with files
-2. Post INSERT event triggers
+#### Post Updates
+1. User edits a post
+2. Post UPDATE event triggers
 3. Complete post data is fetched including:
+   - Updated content
    - File attachments
    - File metadata
    - User data
    - Translations
-4. Post is added to state with all data
-5. Files appear immediately without refresh
+4. Post is transformed to include all related data
+5. Only the specific post is updated in state
+6. UI updates immediately for all users
+7. Changes appear without refresh
 
 #### File Attachment Changes
 1. File attachment INSERT/UPDATE/DELETE event triggers
