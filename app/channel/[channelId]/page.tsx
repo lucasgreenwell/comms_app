@@ -10,8 +10,8 @@ import { LogOut, Paperclip, X } from 'lucide-react'
 import PostItem from './PostItem'
 import ThreadComments from './ThreadComments'
 import { useToast } from "@/components/ui/use-toast"
-import { Post } from '@/app/types/post'
 import type { Channel } from '@/app/types/entities/Channel'
+import type { Post } from '@/app/types/entities/Post'
 
 export default function Channel() {
   const { channelId } = useParams()
@@ -90,15 +90,108 @@ export default function Channel() {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch(`/api/posts?channelId=${channelId}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch posts')
+      const supabase = getSupabase()
+
+      type DbPost = {
+        id: string;
+        content: string;
+        created_at: string;
+        user_id: string;
+        channel_id: string;
+        files: {
+          id: string;
+          file: {
+            id: string;
+            file_name: string;
+            file_type: string;
+            file_size: number;
+            path: string;
+          };
+        }[] | null;
+        translations: {
+          id: string;
+          message_id: string | null;
+          conversation_thread_comment_id: string | null;
+          post_id: string | null;
+          post_thread_comment_id: string | null;
+          mandarin_chinese_translation: string | null;
+          spanish_translation: string | null;
+          english_translation: string | null;
+          hindi_translation: string | null;
+          arabic_translation: string | null;
+          bengali_translation: string | null;
+          portuguese_translation: string | null;
+          russian_translation: string | null;
+          japanese_translation: string | null;
+          western_punjabi_translation: string | null;
+        }[] | null;
       }
-      const data = await response.json()
-      setPosts(data)
+
+      // Fetch posts with file attachments and translations
+      const { data: posts, error: postsError } = await supabase
+        .from('posts')
+        .select(`
+          id, 
+          user_id,
+          channel_id,
+          content, 
+          created_at,
+          files:file_attachments(
+            id,
+            file:file_id(
+              id,
+              file_name,
+              file_type,
+              file_size,
+              path
+            )
+          ),
+          translations (
+            id,
+            mandarin_chinese_translation,
+            spanish_translation,
+            english_translation,
+            hindi_translation,
+            arabic_translation,
+            bengali_translation,
+            portuguese_translation,
+            russian_translation,
+            japanese_translation,
+            western_punjabi_translation
+          )
+        `)
+        .eq('channel_id', channelId)
+        .order('created_at', { ascending: true })
+
+      if (postsError) throw postsError
+
+      // Fetch user data
+      const userIds = [...new Set(posts.map(post => post.user_id))]
+      const { data: users, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, display_name, native_language')
+        .in('id', userIds)
+
+      if (usersError) throw usersError
+
+      // Transform posts to include files array and user info
+      const postsWithUserInfo = (posts as unknown as DbPost[])?.map(post => ({
+        ...post,
+        user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User', display_name: null },
+        files: post.files?.map(f => ({
+          id: f.file.id,
+          file_name: f.file.file_name,
+          file_type: f.file.file_type,
+          file_size: f.file.file_size,
+          path: f.file.path
+        })) || [],
+        translation: post.translations?.[0] || null
+      }))
+
+      setPosts(postsWithUserInfo)
     } catch (error) {
-      setError('Failed to fetch posts')
       console.error('Error fetching posts:', error)
+      setError('Failed to fetch posts')
     } finally {
       setLoading(false)
     }
@@ -234,7 +327,7 @@ export default function Channel() {
               setPosts(prevPosts => 
                 prevPosts.map(post => ({
                   ...post,
-                  files: post.files?.map(f => 
+                  files: post.files?.map((f: { id: string; file_name: string; file_type: string; file_size: number; path: string; }) => 
                     files.find(newFile => newFile.id === f.id) || f
                   )
                 }))
@@ -274,52 +367,26 @@ export default function Channel() {
     e.preventDefault()
     if (!newMessage.trim() && selectedFiles.length === 0) return
 
-    // Create a temporary post for optimistic update
-    const tempPost: Post = {
-      id: `temp-${Date.now()}`, // temporary ID that will be replaced
-      user_id: currentUser?.id || '',
-      channel_id: channelId as string,
-      content: newMessage.trim(),
-      created_at: new Date().toISOString(),
-      user: {
-        id: currentUser?.id || '',
-        email: currentUser?.email || '',
-        display_name: currentUser?.display_name,
-        native_language: currentUser?.native_language
-      },
-      files: [], // Will be updated after file upload
-      translation: null
-    }
-
     try {
-      if (!currentUser) throw new Error('User not authenticated')
-
-      // Optimistically add the post to the state
-      setPosts(prevPosts => [...prevPosts, tempPost])
-      
-      // Clear input immediately for better UX
-      setNewMessage('')
-      const filesToUpload = [...selectedFiles]
-      setSelectedFiles([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
 
       // First, upload any files
-      const filePromises = filesToUpload.map(async (file) => {
+      const filePromises = selectedFiles.map(async (file: File) => {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-        const filePath = `${currentUser.id}/${fileName}`
+        const filePath = `${user.id}/${fileName}`
 
         // Upload file to storage
-        const { error: uploadError } = await getSupabase().storage
+        const { error: uploadError } = await supabase.storage
           .from('file-uploads')
           .upload(filePath, file)
 
         if (uploadError) throw uploadError
 
         // Create file record
-        const { data: fileData, error: fileRecordError } = await getSupabase()
+        const { data: fileData, error: fileRecordError } = await supabase
           .from('files')
           .insert({
             file_name: file.name,
@@ -327,7 +394,7 @@ export default function Channel() {
             file_size: file.size,
             bucket: 'file-uploads',
             path: filePath,
-            uploaded_by: currentUser.id
+            uploaded_by: user.id
           })
           .select()
           .single()
@@ -340,39 +407,71 @@ export default function Channel() {
       const uploadedFiles = await Promise.all(filePromises)
 
       // Create post
-      const response = await fetch('/api/posts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          channelId,
-          userId: currentUser.id,
-          content: newMessage.trim(),
-          fileIds: uploadedFiles.map(file => file.id)
-        }),
-      })
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .insert({
+          channel_id: channelId,
+          user_id: user.id,
+          content: newMessage.trim()
+        })
+        .select()
+        .single()
 
-      if (!response.ok) {
-        throw new Error('Failed to send message')
+      if (postError) throw postError
+
+      // Create file attachments
+      if (uploadedFiles.length > 0) {
+        const { error: attachmentError } = await supabase
+          .from('file_attachments')
+          .insert(
+            uploadedFiles.map(file => ({
+              file_id: file.id,
+              post_id: postData.id
+            }))
+          )
+
+        if (attachmentError) throw attachmentError
       }
 
-      const actualPost = await response.json()
+      // Clear input and show success immediately
+      setNewMessage('')
+      setSelectedFiles([])
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
 
-      // Replace the temporary post with the actual one
-      setPosts(prevPosts => 
-        prevPosts.map(post => 
-          post.id.startsWith('temp-') ? { ...actualPost, files: uploadedFiles } : post
-        )
-      )
+      toast({
+        title: "Message sent",
+        description: "Your message has been sent successfully."
+      })
+
+      // Trigger translation in the background
+      const triggerTranslation = async () => {
+        try {
+          await fetch('/api/translations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              postId: postData.id,
+              senderId: user.id
+            }),
+          })
+        } catch (translationError) {
+          console.error('Translation error:', translationError)
+        }
+      }
+
+      // Don't await the translation
+      triggerTranslation()
+
     } catch (error) {
       console.error('Error sending message:', error)
-      // Remove the temporary post if there was an error
-      setPosts(prevPosts => prevPosts.filter(post => post.id !== tempPost.id))
       toast({
-        title: "Error",
-        description: "Failed to send message",
         variant: "destructive",
+        title: "Error sending message",
+        description: "There was an error sending your message. Please try again."
       })
     }
   }

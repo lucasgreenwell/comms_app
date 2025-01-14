@@ -274,8 +274,44 @@
 - Many tables include user references (likely `users.id` or possibly `auth.users.id`).  
 - Relationship tables (e.g., **channel_members**, **conversation_participants**) handle many-to-many links.  
 - Some tables (like **translations**, **file_attachments**, **emoji_reactions**) can reference multiple content tables by including columns such as `message_id`, `post_id`, or `comment_id`. Usually only one of those columns is used per record.  
-- We’ve added `last_read_at` to **conversation_participants** for conversation-level read tracking.  
-- We’ve optionally created **message_reads** for per-message read receipts if that’s needed in the future.
+- We've added `last_read_at` to **conversation_participants** for conversation-level read tracking.  
+- We've optionally created **message_reads** for per-message read receipts if that's needed in the future.
+
+## Row Level Security (RLS) Policies
+
+### Posts Table Policies
+```sql
+-- Enable read access for all users
+CREATE POLICY "Enable read access for all users" 
+ON posts FOR SELECT 
+TO public 
+USING (true);
+
+-- Users can delete their own posts
+CREATE POLICY "Users can delete their own posts" 
+ON posts FOR DELETE 
+TO public 
+USING (auth.uid() = user_id);
+
+-- Users can update their own posts
+CREATE POLICY "Users can update their own posts" 
+ON posts FOR UPDATE 
+TO public 
+USING (auth.uid() = user_id) 
+WITH CHECK (auth.uid() = user_id);
+
+-- Users can create posts
+CREATE POLICY "Users can create posts" 
+ON posts FOR INSERT 
+TO public 
+WITH CHECK (auth.uid() = user_id);
+```
+
+These policies ensure that:
+1. Anyone can read posts (SELECT)
+2. Only the post author can delete their posts (DELETE)
+3. Only the post author can update their posts (UPDATE)
+4. Only authenticated users can create posts as themselves (INSERT)
 
 ## Authentication
 - The `users` table may be linked to the authentication system via `auth.users.id`.  

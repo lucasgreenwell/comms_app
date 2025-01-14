@@ -304,7 +304,7 @@ export default function Sidebar() {
         } else {
           console.error('Unexpected error creating channel:', channelError)
           toast.error('An unexpected error occurred. Please try again later.')
-          setIsDialogOpen(false);
+          setIsDialogOpen(false)
         }
         return
       }

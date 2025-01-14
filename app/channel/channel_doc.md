@@ -119,18 +119,22 @@ interface ThreadComment {
 ### Post Creation Flow
 1. User enters message content and/or selects files
 2. Frontend:
-   - Creates temporary post with optimistic update
-   - Clears input field and file selection
-   - Displays temporary post in UI
-3. Backend Process:
-   - Uploads any attached files to Supabase storage
-   - Creates file records in `files` table
-   - Creates post record in `posts` table
-   - Links files to post in `file_attachments` table
-4. Real-time Updates:
-   - Other users receive post via Supabase real-time subscription
+   - Validates input (content and/or files required)
+   - Shows file preview if files selected
+   - Allows file removal before sending
+3. Database Operations (Direct Supabase Calls):
+   - Upload files to Supabase storage (if any)
+   - Create file records in `files` table
+   - Create post record in `posts` table
+   - Create file attachments in `file_attachments` table
+4. Translation Process:
+   - Trigger translation API in background
    - Translation service processes the post
    - Users receive translation updates via subscription
+5. Real-time Updates:
+   - Other users receive post via Supabase real-time subscription
+   - File attachments trigger additional real-time updates
+   - Translations arrive asynchronously via subscription
 
 ### File Upload Flow
 1. User selects files through the UI
@@ -339,6 +343,34 @@ CREATE TABLE posts (
     user_id UUID REFERENCES users(id),
     channel_id UUID REFERENCES channels(id)
 );
+
+-- Row Level Security (RLS) Policies
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+-- Enable read access for all users
+CREATE POLICY "Enable read access for all users" 
+ON posts FOR SELECT 
+TO public 
+USING (true);
+
+-- Users can delete their own posts
+CREATE POLICY "Users can delete their own posts" 
+ON posts FOR DELETE 
+TO public 
+USING (auth.uid() = user_id);
+
+-- Users can update their own posts
+CREATE POLICY "Users can update their own posts" 
+ON posts FOR UPDATE 
+TO public 
+USING (auth.uid() = user_id) 
+WITH CHECK (auth.uid() = user_id);
+
+-- Users can create posts
+CREATE POLICY "Users can create posts" 
+ON posts FOR INSERT 
+TO public 
+WITH CHECK (auth.uid() = user_id);
 ```
 
 ### Post Thread Comments Table
@@ -422,21 +454,34 @@ CREATE TABLE channel_members (
 ## Real-time Features
 
 The application uses Supabase's real-time functionality for:
-1. Message updates
+1. Post updates (INSERT, UPDATE, DELETE)
 2. File attachment changes
 3. Translation updates
 4. Thread comment synchronization
 
 ## Request/Response Formats
 
-### Create Post Request
+### Translations Request
 ```typescript
-POST /api/posts
+POST /api/translations
 {
-  channelId: string
-  userId: string
-  content: string
-  fileIds?: string[]
+  postId: string      // Required for channel posts
+  senderId: string    // Required - ID of the user who created the content
+}
+
+// Response
+{
+  id: string
+  mandarin_chinese_translation: string | null
+  spanish_translation: string | null
+  english_translation: string | null
+  hindi_translation: string | null
+  arabic_translation: string | null
+  bengali_translation: string | null
+  portuguese_translation: string | null
+  russian_translation: string | null
+  japanese_translation: string | null
+  western_punjabi_translation: string | null
 }
 ```
 
@@ -446,12 +491,112 @@ GET /api/thread-comments?postId={postId}
 Response: ThreadComment[]
 ```
 
+## Database Operations
+
+### Creating a Post
+```typescript
+// 1. Upload files to storage (if any)
+const { error: uploadError } = await supabase.storage
+  .from('file-uploads')
+  .upload(filePath, file)
+
+// 2. Create file records
+const { data: fileData } = await supabase
+  .from('files')
+  .insert({
+    file_name: string,
+    file_type: string,
+    file_size: number,
+    bucket: 'file-uploads',
+    path: string,
+    uploaded_by: UUID
+  })
+  .select()
+  .single()
+
+// 3. Create post
+const { data: postData } = await supabase
+  .from('posts')
+  .insert({
+    channel_id: UUID,
+    user_id: UUID,
+    content: string
+  })
+  .select()
+  .single()
+
+// 4. Create file attachments (if any)
+const { error: attachmentError } = await supabase
+  .from('file_attachments')
+  .insert(
+    files.map(file => ({
+      file_id: UUID,
+      post_id: UUID
+    }))
+  )
+```
+
 ## Error Handling
 
 The application implements comprehensive error handling for:
-- Failed message sends
+- Failed database operations
 - File upload errors
 - Network issues
 - Authentication errors
+- Translation service errors
 
-Each error is caught and displayed to the user via toast notifications. 
+Each error is caught and displayed to the user via toast notifications, with specific handling for:
+1. File upload failures
+2. Post creation failures
+3. File attachment failures
+4. Translation request failures
+
+## Real-time Features
+
+The application uses Supabase's real-time functionality for:
+1. Post updates (INSERT, UPDATE, DELETE)
+2. File attachment changes
+3. Translation updates
+4. Thread comment synchronization
+
+### Real-time Subscriptions
+```typescript
+// Posts subscription
+channel.on('postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'posts',
+    filter: `channel_id=eq.${channelId}`
+  },
+  (payload) => {
+    // Handle post changes
+  }
+)
+
+// File attachments subscription
+channel.on('postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'file_attachments',
+    filter: `post_id=in.(${postIds.join(',')})`
+  },
+  () => {
+    // Handle file attachment changes
+  }
+)
+
+// Files subscription
+channel.on('postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'files',
+    filter: `id=in.(${fileIds.join(',')})`
+  },
+  () => {
+    // Handle file changes
+  }
+)
+``` 

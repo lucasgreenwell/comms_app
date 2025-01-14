@@ -4,5 +4,5 @@
   "/profile/login/page": "app/profile/login/page.js",
   "/profile/signup/page": "app/profile/signup/page.js",
   "/profile/page": "app/profile/page.js",
-  "/api/posts/route": "app/api/posts/route.js"
+  "/api/translations/route": "app/api/translations/route.js"
 }

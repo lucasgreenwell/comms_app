@@ -86,68 +86,39 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { channelId, userId, content } = body
+    const { postId, userId } = body
 
-    if (!channelId || !userId) {
+    if (!postId || !userId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Only create post if there's content or files will be attached
-    if (!content?.trim() && !body.files?.length) {
-      return NextResponse.json({ error: 'Post must have content or files' }, { status: 400 })
-    }
-
-    const { data: post, error } = await supabase
+    // Get the post content
+    const { data: post, error: postError } = await supabase
       .from('posts')
-      .insert({
-        channel_id: channelId,
-        user_id: userId,
-        content: content?.trim() || ''
-      })
-      .select()
+      .select('content')
+      .eq('id', postId)
       .single()
 
-    if (error) throw error
+    if (postError) throw postError
+    if (!post) throw new Error('Post not found')
 
-    // Fetch user data
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, email, display_name, native_language')
-      .eq('id', userId)
-      .single()
+    // Get languages data
+    const languagesData = await getLanguages()
 
-    if (userError) throw userError
+    // Create translations
+    const translation = await createTranslations(
+      post.content,
+      null, // messageId
+      null, // conversationThreadCommentId
+      postId,
+      null, // postThreadCommentId
+      languagesData
+    )
 
-    // Create translations for the post
-    if (content?.trim()) {
-      try {
-        const languagesData = await getLanguages();
-        await createTranslations(
-          content.trim(),
-          null, // messageId
-          null, // conversationThreadCommentId
-          post.id, // postId
-          null, // postThreadCommentId
-          languagesData
-        );
-      } catch (translationError) {
-        console.error('Error creating translations:', translationError);
-        // Don't throw error here, just log it - we still want to return the post
-      }
-    }
-
-    // Return post with user information
-    const postWithUser = {
-      ...post,
-      user,
-      files: [],
-      translation: null
-    }
-
-    return NextResponse.json(postWithUser)
+    return NextResponse.json(translation)
   } catch (error) {
-    console.error('Error creating post:', error)
-    return NextResponse.json({ error: 'Failed to create post' }, { status: 500 })
+    console.error('Error creating translations:', error)
+    return NextResponse.json({ error: 'Failed to create translations' }, { status: 500 })
   }
 }
 
