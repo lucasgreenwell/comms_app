@@ -199,51 +199,136 @@ export default function Channel() {
 
   const setupRealtimeSubscription = () => {
     const supabase = getSupabase()
-
-    // Get all post IDs and file IDs for filters
     const postIds = posts.map(p => p.id)
     const fileIds = posts.flatMap(p => p.files || []).map(f => f.id)
 
-    let channel = supabase.channel(`public:posts:channel_id=eq.${channelId}`)
+    let channel = supabase.channel(`posts:${channelId}`)
 
     // Listen for post changes
-    channel = channel.on('postgres_changes', 
+    channel = channel.on(
+      'postgres_changes' as any,
       { 
         event: '*', 
         schema: 'public', 
         table: 'posts', 
         filter: `channel_id=eq.${channelId}` 
       }, 
-      (payload) => {
+      async (payload) => {
         if (payload.eventType === 'INSERT') {
-          const fetchUserDetails = async (userId: string) => {
-            const { data: user, error } = await getSupabase()
-              .from('users')
-              .select('id, email, display_name')
-              .eq('id', userId)
-              .single();
-            if (error) {
-              console.error('Error fetching user details:', error);
-              return { id: 'unknown', email: 'unknown', display_name: 'unknown' };
-            }
-            return user;
-          };
+          type DbPost = {
+            id: string;
+            user_id: string;
+            channel_id: string;
+            content: string;
+            created_at: string;
+            files: {
+              id: string;
+              file: {
+                id: string;
+                file_name: string;
+                file_type: string;
+                file_size: number;
+                path: string;
+              };
+            }[] | null;
+            translations: {
+              id: string;
+              message_id: string | null;
+              conversation_thread_comment_id: string | null;
+              post_id: string | null;
+              post_thread_comment_id: string | null;
+              mandarin_chinese_translation: string | null;
+              spanish_translation: string | null;
+              english_translation: string | null;
+              hindi_translation: string | null;
+              arabic_translation: string | null;
+              bengali_translation: string | null;
+              portuguese_translation: string | null;
+              russian_translation: string | null;
+              japanese_translation: string | null;
+              western_punjabi_translation: string | null;
+            }[] | null;
+          }
 
-          fetchUserDetails(payload.new.user_id).then(user => {
-            const newPost: Post = {
-              id: payload.new.id,
-              user_id: payload.new.user_id,
-              channel_id: payload.new.channel_id,
-              content: payload.new.content,
-              created_at: payload.new.created_at,
-              user: {
-                id: user.id,
-                email: user.email,
-                display_name: user.display_name || user.email
-              }
-            };
-            setPosts(prevPosts => [...prevPosts, newPost]);
-          });
+          // Fetch the complete post data including files
+          const { data: postData, error: postError } = await supabase
+            .from('posts')
+            .select(`
+              id, 
+              user_id,
+              channel_id,
+              content, 
+              created_at,
+              files:file_attachments(
+                id,
+                file:file_id(
+                  id,
+                  file_name,
+                  file_type,
+                  file_size,
+                  path
+                )
+              ),
+              translations (
+                id,
+                message_id,
+                conversation_thread_comment_id,
+                post_id,
+                post_thread_comment_id,
+                mandarin_chinese_translation,
+                spanish_translation,
+                english_translation,
+                hindi_translation,
+                arabic_translation,
+                bengali_translation,
+                portuguese_translation,
+                russian_translation,
+                japanese_translation,
+                western_punjabi_translation
+              )
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (postError) {
+            console.error('Error fetching new post:', postError)
+            return
+          }
+
+          const post = postData as unknown as DbPost
+
+          // Fetch user data for the post
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, email, display_name, native_language')
+            .eq('id', post.user_id)
+            .single()
+
+          if (userError) {
+            console.error('Error fetching user details:', userError)
+            return
+          }
+
+          // Transform the post data
+          const newPost: Post = {
+            ...post,
+            user: {
+              id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              native_language: user.native_language
+            },
+            files: post.files?.map((f: { file: { id: string; file_name: string; file_type: string; file_size: number; path: string; }; }) => ({
+              id: f.file.id,
+              file_name: f.file.file_name,
+              file_type: f.file.file_type,
+              file_size: f.file.file_size,
+              path: f.file.path
+            })) || [],
+            translation: post.translations?.[0] || null
+          }
+
+          setPosts(prevPosts => [...prevPosts, newPost])
         } else if (payload.eventType === 'UPDATE') {
           setPosts(prevPosts => 
             prevPosts.map(post => 
@@ -258,83 +343,270 @@ export default function Channel() {
 
     // Only add file_attachments subscription if we have posts
     if (postIds.length > 0) {
-      channel = channel.on('postgres_changes',
+      channel = channel.on(
+        'postgres_changes' as any,
         {
           event: '*',
           schema: 'public',
           table: 'file_attachments',
           filter: `post_id=in.(${postIds.join(',')})`
         },
-        () => {
-          // Instead of refetching, update the posts state
-          const fetchPostFiles = async () => {
-            const { data: attachments } = await getSupabase()
-              .from('file_attachments')
-              .select(`
-                post_id,
-                file:files(
+        async (payload: { new?: { post_id: string }, old?: { post_id: string } }) => {
+          // Fetch the complete post data for the affected post
+          const postId = payload.new?.post_id || payload.old?.post_id
+          if (!postId) return
+
+          type DbPost = {
+            id: string;
+            user_id: string;
+            channel_id: string;
+            content: string;
+            created_at: string;
+            files: {
+              id: string;
+              file: {
+                id: string;
+                file_name: string;
+                file_type: string;
+                file_size: number;
+                path: string;
+              };
+            }[] | null;
+            translations: {
+              id: string;
+              message_id: string | null;
+              conversation_thread_comment_id: string | null;
+              post_id: string | null;
+              post_thread_comment_id: string | null;
+              mandarin_chinese_translation: string | null;
+              spanish_translation: string | null;
+              english_translation: string | null;
+              hindi_translation: string | null;
+              arabic_translation: string | null;
+              bengali_translation: string | null;
+              portuguese_translation: string | null;
+              russian_translation: string | null;
+              japanese_translation: string | null;
+              western_punjabi_translation: string | null;
+            }[] | null;
+          }
+
+          const { data: postData, error: postError } = await supabase
+            .from('posts')
+            .select(`
+              id, 
+              user_id,
+              channel_id,
+              content, 
+              created_at,
+              files:file_attachments(
+                id,
+                file:file_id(
                   id,
                   file_name,
                   file_type,
                   file_size,
                   path
                 )
-              `)
-              .in('post_id', postIds);
+              ),
+              translations (
+                id,
+                message_id,
+                conversation_thread_comment_id,
+                post_id,
+                post_thread_comment_id,
+                mandarin_chinese_translation,
+                spanish_translation,
+                english_translation,
+                hindi_translation,
+                arabic_translation,
+                bengali_translation,
+                portuguese_translation,
+                russian_translation,
+                japanese_translation,
+                western_punjabi_translation
+              )
+            `)
+            .eq('id', postId)
+            .single()
 
-            if (attachments) {
-              const filesByPostId = attachments.reduce((acc: any, curr) => {
-                if (!acc[curr.post_id]) {
-                  acc[curr.post_id] = [];
-                }
-                if (curr.file) {
-                  acc[curr.post_id].push(curr.file);
-                }
-                return acc;
-              }, {});
+          if (postError) {
+            console.error('Error fetching updated post:', postError)
+            return
+          }
 
-              setPosts(prevPosts => 
-                prevPosts.map(post => ({
-                  ...post,
-                  files: filesByPostId[post.id] || []
-                }))
-              );
-            }
-          };
-          fetchPostFiles();
+          const post = postData as unknown as DbPost
+
+          // Fetch user data for the post
+          const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('id, email, display_name, native_language')
+            .eq('id', post.user_id)
+            .single()
+
+          if (userError) {
+            console.error('Error fetching user details:', userError)
+            return
+          }
+
+          // Transform the post data
+          const updatedPost: Post = {
+            ...post,
+            user: {
+              id: user.id,
+              email: user.email,
+              display_name: user.display_name,
+              native_language: user.native_language
+            },
+            files: post.files?.map(f => ({
+              id: f.file.id,
+              file_name: f.file.file_name,
+              file_type: f.file.file_type,
+              file_size: f.file.file_size,
+              path: f.file.path
+            })) || [],
+            translation: post.translations?.[0] || null
+          }
+
+          // Update only the affected post in the state
+          setPosts(prevPosts =>
+            prevPosts.map(p =>
+              p.id === postId ? updatedPost : p
+            )
+          )
         }
       )
     }
 
     // Only add files subscription if we have files
     if (fileIds.length > 0) {
-      channel = channel.on('postgres_changes',
+      channel = channel.on(
+        'postgres_changes' as any,
         {
           event: '*',
           schema: 'public',
           table: 'files',
           filter: `id=in.(${fileIds.join(',')})`
         },
-        () => {
-          // Instead of refetching, update the posts state
-          const fetchUpdatedFiles = async () => {
-            const { data: files } = await getSupabase()
-              .from('files')
-              .select('*')
-              .in('id', fileIds);
+        async (payload: { new?: { id: string }, old?: { id: string } }) => {
+          // Find which posts contain this file
+          const affectedPostIds = posts
+            .filter(post => post.files?.some(file => file.id === payload.new?.id || file.id === payload.old?.id))
+            .map(post => post.id)
 
-            if (files) {
-              setPosts(prevPosts => 
-                prevPosts.map(post => ({
-                  ...post,
-                  files: post.files?.map((f: { id: string; file_name: string; file_type: string; file_size: number; path: string; }) => 
-                    files.find(newFile => newFile.id === f.id) || f
-                  )
-                }))
-              );
-            }
-          };
-          fetchUpdatedFiles();
+          type DbPost = {
+            id: string;
+            user_id: string;
+            channel_id: string;
+            content: string;
+            created_at: string;
+            files: {
+              id: string;
+              file: {
+                id: string;
+                file_name: string;
+                file_type: string;
+                file_size: number;
+                path: string;
+              };
+            }[] | null;
+            translations: {
+              id: string;
+              message_id: string | null;
+              conversation_thread_comment_id: string | null;
+              post_id: string | null;
+              post_thread_comment_id: string | null;
+              mandarin_chinese_translation: string | null;
+              spanish_translation: string | null;
+              english_translation: string | null;
+              hindi_translation: string | null;
+              arabic_translation: string | null;
+              bengali_translation: string | null;
+              portuguese_translation: string | null;
+              russian_translation: string | null;
+              japanese_translation: string | null;
+              western_punjabi_translation: string | null;
+            }[] | null;
+          }
+
+          // Fetch complete data for affected posts
+          const { data: postsData, error: postsError } = await supabase
+            .from('posts')
+            .select(`
+              id, 
+              user_id,
+              channel_id,
+              content, 
+              created_at,
+              files:file_attachments(
+                id,
+                file:file_id(
+                  id,
+                  file_name,
+                  file_type,
+                  file_size,
+                  path
+                )
+              ),
+              translations (
+                id,
+                message_id,
+                conversation_thread_comment_id,
+                post_id,
+                post_thread_comment_id,
+                mandarin_chinese_translation,
+                spanish_translation,
+                english_translation,
+                hindi_translation,
+                arabic_translation,
+                bengali_translation,
+                portuguese_translation,
+                russian_translation,
+                japanese_translation,
+                western_punjabi_translation
+              )
+            `)
+            .in('id', affectedPostIds)
+
+          if (postsError) {
+            console.error('Error fetching updated posts:', postsError)
+            return
+          }
+
+          const updatedPosts = postsData as unknown as DbPost[]
+
+          // Fetch user data for the posts
+          const userIds = [...new Set(updatedPosts.map(post => post.user_id))]
+          const { data: users, error: usersError } = await supabase
+            .from('users')
+            .select('id, email, display_name, native_language')
+            .in('id', userIds)
+
+          if (usersError) {
+            console.error('Error fetching user details:', usersError)
+            return
+          }
+
+          // Transform the posts data
+          const transformedPosts: Post[] = updatedPosts.map(post => ({
+            ...post,
+            user: users.find(user => user.id === post.user_id)!,
+            files: post.files?.map(f => ({
+              id: f.file.id,
+              file_name: f.file.file_name,
+              file_type: f.file.file_type,
+              file_size: f.file.file_size,
+              path: f.file.path
+            })) || [],
+            translation: post.translations?.[0] || null
+          }))
+
+          // Update only the affected posts in the state
+          setPosts(prevPosts =>
+            prevPosts.map(post =>
+              transformedPosts.find(p => p.id === post.id) || post
+            )
+          )
         }
       )
     }

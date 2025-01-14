@@ -69,13 +69,6 @@ interface Participant {
   display_name?: string | null
 }
 
-interface User {
-  id: string
-  email: string
-  display_name?: string | null
-  native_language?: string | null
-}
-
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const searchParams = useSearchParams()

@@ -560,6 +560,8 @@ The application uses Supabase's real-time functionality for:
 4. Thread comment synchronization
 
 ### Real-time Subscriptions
+
+#### Post Changes
 ```typescript
 // Posts subscription
 channel.on('postgres_changes',
@@ -569,8 +571,43 @@ channel.on('postgres_changes',
     table: 'posts',
     filter: `channel_id=eq.${channelId}`
   },
-  (payload) => {
-    // Handle post changes
+  async (payload) => {
+    if (payload.eventType === 'INSERT') {
+      // Fetch complete post data including files and translations
+      const { data: post } = await supabase
+        .from('posts')
+        .select(`
+          id, 
+          user_id,
+          channel_id,
+          content, 
+          created_at,
+          files:file_attachments(
+            id,
+            file:file_id(
+              id,
+              file_name,
+              file_type,
+              file_size,
+              path
+            )
+          ),
+          translations(*)
+        `)
+        .eq('id', payload.new.id)
+        .single()
+
+      // Fetch user data
+      const { data: user } = await supabase
+        .from('users')
+        .select('id, email, display_name, native_language')
+        .eq('id', post.user_id)
+        .single()
+
+      // Transform and add to state
+      setPosts(prevPosts => [...prevPosts, transformedPost])
+    }
+    // Handle UPDATE and DELETE...
   }
 )
 
@@ -582,8 +619,41 @@ channel.on('postgres_changes',
     table: 'file_attachments',
     filter: `post_id=in.(${postIds.join(',')})`
   },
-  () => {
-    // Handle file attachment changes
+  async (payload) => {
+    const postId = payload.new?.post_id || payload.old?.post_id
+    if (!postId) return
+
+    // Fetch complete post data
+    const { data: post } = await supabase
+      .from('posts')
+      .select(`
+        id, 
+        user_id,
+        channel_id,
+        content, 
+        created_at,
+        files:file_attachments(
+          id,
+          file:file_id(*)
+        ),
+        translations(*)
+      `)
+      .eq('id', postId)
+      .single()
+
+    // Fetch user data
+    const { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', post.user_id)
+      .single()
+
+    // Transform and update only the affected post
+    setPosts(prevPosts =>
+      prevPosts.map(p =>
+        p.id === postId ? transformedPost : p
+      )
+    )
   }
 )
 
@@ -595,8 +665,130 @@ channel.on('postgres_changes',
     table: 'files',
     filter: `id=in.(${fileIds.join(',')})`
   },
-  () => {
-    // Handle file changes
+  async (payload) => {
+    // Find affected posts
+    const affectedPostIds = posts
+      .filter(post => post.files?.some(file => 
+        file.id === payload.new?.id || file.id === payload.old?.id
+      ))
+      .map(post => post.id)
+
+    // Fetch complete data for affected posts
+    const { data: updatedPosts } = await supabase
+      .from('posts')
+      .select(`
+        id, 
+        user_id,
+        channel_id,
+        content, 
+        created_at,
+        files:file_attachments(
+          id,
+          file:file_id(*)
+        ),
+        translations(*)
+      `)
+      .in('id', affectedPostIds)
+
+    // Fetch user data
+    const userIds = [...new Set(updatedPosts.map(post => post.user_id))]
+    const { data: users } = await supabase
+      .from('users')
+      .select('*')
+      .in('id', userIds)
+
+    // Transform and update only affected posts
+    setPosts(prevPosts =>
+      prevPosts.map(post =>
+        transformedPosts.find(p => p.id === post.id) || post
+      )
+    )
   }
 )
-``` 
+```
+
+### Real-time Data Flow
+
+#### New Post Creation
+1. User creates a post with files
+2. Post INSERT event triggers
+3. Complete post data is fetched including:
+   - File attachments
+   - File metadata
+   - User data
+   - Translations
+4. Post is added to state with all data
+5. Files appear immediately without refresh
+
+#### File Attachment Changes
+1. File attachment INSERT/UPDATE/DELETE event triggers
+2. Complete post data is fetched for affected post
+3. Only the affected post is updated in state
+4. UI updates immediately without refresh
+
+#### File Metadata Changes
+1. File UPDATE event triggers
+2. Affected posts are identified
+3. Complete data is fetched for all affected posts
+4. Only affected posts are updated in state
+5. UI updates immediately without refresh
+
+### State Management
+- Posts state is updated atomically
+- Only affected posts are re-rendered
+- No full page refreshes required
+- Optimistic updates for better UX
+- Real-time synchronization across clients
+
+### Error Handling
+- Failed fetches are logged
+- State remains consistent
+- User is notified of errors via toast notifications
+- Graceful degradation if real-time connection fails
+
+### Performance Considerations
+1. Targeted state updates minimize re-renders
+2. Batch updates for multiple affected posts
+3. Efficient database queries using joins
+4. Proper cleanup of subscriptions
+5. Type safety throughout the real-time pipeline
+
+### Type Safety
+```typescript
+type DbPost = {
+  id: string;
+  user_id: string;
+  channel_id: string;
+  content: string;
+  created_at: string;
+  files: {
+    id: string;
+    file: {
+      id: string;
+      file_name: string;
+      file_type: string;
+      file_size: number;
+      path: string;
+    };
+  }[] | null;
+  translations: {
+    id: string;
+    message_id: string | null;
+    conversation_thread_comment_id: string | null;
+    post_id: string | null;
+    post_thread_comment_id: string | null;
+    mandarin_chinese_translation: string | null;
+    spanish_translation: string | null;
+    english_translation: string | null;
+    hindi_translation: string | null;
+    arabic_translation: string | null;
+    bengali_translation: string | null;
+    portuguese_translation: string | null;
+    russian_translation: string | null;
+    japanese_translation: string | null;
+    western_punjabi_translation: string | null;
+  }[] | null;
+}
+```
+
+This type ensures proper handling of database responses and transformations. 
