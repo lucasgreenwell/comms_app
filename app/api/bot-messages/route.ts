@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: "You are a helpful AI assistant in a chat application. Use the provided context to help answer the user's question. If no relevant context is found, respond based on your general knowledge. Keep responses concise and friendly. Your response must be a valid JSON object with two fields: 'response' (your text response) and 'relevant_sources' (an array of indices of the provided sources that contained the information requested by the user)."
+          content: "You are a helpful AI assistant in a chat application. Use the provided context to help answer the user's question. If no relevant context is found, respond based on your general knowledge. Keep responses concise and friendly. Your response must be a valid JSON object with two fields: 'response' (your text response) and 'relevant_sources' (an array of indices of the provided sources that contained the information requested by the user). If there are multiple sources used, include all of them in the relevant_sources array. Exclude any sources that are not relevant to the user's question."
         },
         {
           role: "user",
@@ -76,17 +76,19 @@ export async function POST(request: Request) {
     }
     const aiResponse = JSON.parse(messageContent)
 
+    console.log('relevant sources', aiResponse.relevant_sources);
+
     // Filter sources to only include the ones marked as relevant
     const relevantSources = similarPosts?.length && aiResponse.relevant_sources.length
-      ? '\n\nSources:\n' + aiResponse.relevant_sources
+      ? '<br><span class="text-xs">Sources: ' + aiResponse.relevant_sources
           .map((index: number) => {
             const post = similarPosts[index]
             return `<a href="/channel/${post.channel_id}?thread=${post.post_id}" target="_blank" rel="noopener noreferrer" class="text-blue-500" title="Opens in new tab">[${index + 1}]</a>`
           })
-          .join('\n')
+          .join('') + '</span>'
       : ''
 
-    // Combine bot's response with filtered sources
+    // Combine bot's response with filtered s ources
     const responseWithSources = aiResponse.response + relevantSources
 
     // Save bot's response as a new message
