@@ -489,7 +489,7 @@ export default function MessageDisplay({
   }
 
   const isCurrentUser = currentUser?.id === user.id;
-
+  
   return (
     <div
       className={`bg-white py-3 px-6 rounded group hover:scale-[1.01] transition-all duration-200 relative pb-4 ${theme.colors.accent} hover:bg-opacity-15`}
@@ -509,7 +509,7 @@ export default function MessageDisplay({
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div>{content}</div>
+                <div dangerouslySetInnerHTML={{ __html: content }}></div>
               </TooltipTrigger>
               {getTranslatedContent() && (
                 <TooltipContent

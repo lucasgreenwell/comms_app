@@ -4,5 +4,7 @@
   "/profile/signup/page": "app/profile/signup/page.js",
   "/profile/page": "app/profile/page.js",
   "/dm/[id]/page": "app/dm/[id]/page.js",
-  "/page": "app/page.js"
+  "/api/bot-messages/route": "app/api/bot-messages/route.js",
+  "/api/translations/route": "app/api/translations/route.js",
+  "/api/thread-comments/route": "app/api/thread-comments/route.js"
 }

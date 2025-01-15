@@ -451,6 +451,28 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         fileInputRef.current.value = ''
       }
 
+      // Check if this is a conversation with the bot user
+      const isBotConversation = participants.some(p => p.id === '54296b9b-091e-4a19-b5b9-b890c24c1912')
+      
+      if (isBotConversation) {
+        // Send message to bot API
+        const botResponse = await fetch('/api/bot-messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: newMessage.trim(),
+            conversationId: params.id,
+            senderId: user.id
+          }),
+        })
+
+        if (!botResponse.ok) {
+          throw new Error('Failed to get bot response')
+        }
+      }
+
       toast({
         title: "Message sent",
         description: "Your message has been sent successfully."
