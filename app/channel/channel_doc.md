@@ -237,6 +237,30 @@ interface ThreadComment {
 5. Real-time updates to thread viewers
 6. Shows toast notification on success/failure
 
+### Voice Message Flow
+1. User clicks voice message button
+2. Frontend:
+   - Shows voice recorder UI
+   - Handles microphone permissions
+   - Provides record/stop controls
+   - Shows preview playback
+3. User records message:
+   - Can preview before sending
+   - Can cancel recording
+   - Can re-record if needed
+4. Backend Process:
+   - Uploads MP3 file to `voice-messages` bucket
+   - Creates file record in `files` table
+   - Creates post record in `posts` table (empty content)
+   - Creates file attachment in `file_attachments` table
+5. Real-time Updates:
+   - Other users receive post via subscription
+   - Voice message appears with playback controls
+6. Error Handling:
+   - Shows toast notification on success/failure
+   - Handles microphone permission errors
+   - Handles upload failures
+
 ## Components
 
 ### 1. Channel Page (`[channelId]/page.tsx`)
@@ -331,6 +355,48 @@ Renders individual comments within a thread discussion, utilizing the shared Mes
 - Uses the shared `MessageDisplay` component for consistent message rendering
 - Integrates with `useUser` hook for current user context
 - Integrates with `usePresence` hook for online user status
+
+### 1. VoiceRecorder (`components/VoiceRecorder.tsx`)
+
+#### Purpose
+Handles recording voice messages in the browser.
+
+#### Key Features
+- Microphone access management
+- Recording controls (start/stop)
+- Preview playback
+- File blob generation
+
+#### Key Functions
+1. `startRecording()`
+   - Requests microphone access
+   - Initializes MediaRecorder
+   - Handles audio chunks
+
+2. `stopRecording()`
+   - Stops recording
+   - Generates audio blob
+   - Creates preview URL
+
+### 2. VoiceMessage (`components/VoiceMessage.tsx`)
+
+#### Purpose
+Displays and plays voice messages.
+
+#### Key Features
+- Audio playback controls
+- Progress bar
+- Duration display
+- Play/pause toggle
+
+#### Key Functions
+1. `togglePlayPause()`
+   - Manages audio playback
+   - Updates play state
+
+2. `formatTime()`
+   - Formats duration display
+   - Shows minutes:seconds
 
 ## Database Schema
 

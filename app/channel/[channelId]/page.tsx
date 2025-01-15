@@ -6,12 +6,14 @@ import { getSupabase } from '../../auth'
 import { useUser } from '../../hooks/useUser'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { LogOut, Paperclip, X } from 'lucide-react'
+import { LogOut, Paperclip, X, Mic } from 'lucide-react'
 import PostItem from './PostItem'
 import ThreadComments from './ThreadComments'
 import { useToast } from "@/components/ui/use-toast"
 import type { Channel } from '@/app/types/entities/Channel'
 import type { Post } from '@/app/types/entities/Post'
+import VoiceRecorder from '../../components/VoiceRecorder'
+import VoiceMessage from '../../components/VoiceMessage'
 
 type DbPost = {
   id: string;
@@ -91,6 +93,7 @@ export default function Channel() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const tourStep = Number(searchParams.get('tourStep')) || 0
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
 
   useEffect(() => {
     fetchChannel()
@@ -933,6 +936,78 @@ export default function Channel() {
     setActiveThread(null)
   }
 
+  const handleVoiceRecordingComplete = async (audioBlob: Blob) => {
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Generate a unique filename
+      const fileName = `${Math.random().toString(36).substring(2)}.mp3`
+      const filePath = `${user.id}/${fileName}`
+
+      // Upload voice message to storage
+      const { error: uploadError } = await supabase.storage
+        .from('voice-messages')
+        .upload(filePath, audioBlob)
+
+      if (uploadError) throw uploadError
+
+      // Create file record
+      const { data: fileData, error: fileRecordError } = await supabase
+        .from('files')
+        .insert({
+          file_name: fileName,
+          file_type: 'audio/mp3',
+          file_size: audioBlob.size,
+          bucket: 'voice-messages',
+          path: filePath,
+          uploaded_by: user.id
+        })
+        .select()
+        .single()
+
+      if (fileRecordError) throw fileRecordError
+
+      // Create post with empty content (voice message only)
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .insert({
+          channel_id: channelId,
+          user_id: user.id,
+          content: ''
+        })
+        .select()
+        .single()
+
+      if (postError) throw postError
+
+      // Create file attachment
+      const { error: attachmentError } = await supabase
+        .from('file_attachments')
+        .insert({
+          file_id: fileData.id,
+          post_id: postData.id
+        })
+
+      if (attachmentError) throw attachmentError
+
+      setShowVoiceRecorder(false)
+      toast({
+        title: "Voice message sent",
+        description: "Your voice message has been sent successfully."
+      })
+
+    } catch (error) {
+      console.error('Error sending voice message:', error)
+      toast({
+        variant: "destructive",
+        title: "Error sending voice message",
+        description: "There was an error sending your voice message. Please try again."
+      })
+    }
+  }
+
   if (loading) return <div>Loading posts...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
@@ -987,6 +1062,15 @@ export default function Channel() {
               type="button"
               variant="outline"
               size="icon"
+              onClick={() => setShowVoiceRecorder(true)}
+              className="w-10 h-10"
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+            <Button 
+              type="button"
+              variant="outline"
+              size="icon"
               onClick={() => fileInputRef.current?.click()}
               className={`${
                 tourStep === 2 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
@@ -1003,6 +1087,12 @@ export default function Channel() {
               Send
             </Button>
           </div>
+          {showVoiceRecorder && (
+            <VoiceRecorder
+              onRecordingComplete={handleVoiceRecordingComplete}
+              onCancel={() => setShowVoiceRecorder(false)}
+            />
+          )}
           <input
             type="file"
             ref={fileInputRef}

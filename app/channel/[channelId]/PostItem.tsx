@@ -4,10 +4,12 @@ import { useUser } from '../../hooks/useUser'
 import { usePresence } from '../../hooks/usePresence'
 import { Button } from '@/components/ui/button'
 import MessageDisplay from '../../components/MessageDisplay'
-import { MessageSquare, Pencil, Trash2 } from 'lucide-react'
+import { MessageSquare, Pencil, Trash2, Paperclip } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 import type { Post } from '@/app/types/entities/Post'
 import type { PostItemProps } from '@/app/types/props/PostItemProps'
+import type { FileAttachment } from '@/app/types/entities/FileAttachment'
+import VoiceMessage from '../../components/VoiceMessage'
 
 export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemProps) {
   const [threadCount, setThreadCount] = useState(0)
@@ -106,6 +108,54 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
     setCurrentPost(updatedPost);
     onPostUpdate(updatedPost);
   };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const renderFileAttachments = () => {
+    if (!post.files || post.files.length === 0) return null
+
+    return (
+      <div className="flex flex-wrap gap-2 mt-2">
+        {post.files.map((file: FileAttachment) => {
+          if (file.file_type === 'audio/mp3') {
+            const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/voice-messages/${file.path}`
+            return (
+              <VoiceMessage
+                key={file.id}
+                url={url}
+                fileName={file.file_name}
+              />
+            )
+          }
+
+          // Handle other file types as before...
+          return (
+            <a
+              key={file.id}
+              href={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/file-uploads/${file.path}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 bg-muted px-2 py-1 rounded hover:bg-muted/80 transition-colors"
+            >
+              <Paperclip className="h-3 w-3" />
+              <span className="text-sm truncate max-w-[200px]">
+                {file.file_name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                ({formatFileSize(file.file_size)})
+              </span>
+            </a>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <MessageDisplay
