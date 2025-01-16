@@ -192,53 +192,137 @@ interface ThreadComment {
 4. Error Handling:
    - Shows toast notification on success/failure
 
-### Thread Comment Flows
-
-#### Comment Creation
-1. User opens thread view
-2. User enters comment content and/or selects files
-3. Frontend:
-   - Shows file preview if files selected
-   - Allows file removal before sending
-4. Backend Process:
-   - Uploads files to Supabase storage (if any)
-   - Creates file records in `files` table
-   - Creates record in `post_thread_comments` table
-   - Creates file attachments in `file_attachments` table
-   - Triggers translation service
+### Thread Comment Flow
+1. User clicks thread icon on a post
+2. Thread view opens in sidebar
+3. User can:
+   - View thread history
+   - Add new comments
+   - Upload files to comments
+   - Record and send voice messages
+   - React with emojis
+4. Data Flow:
+   - Comments are created directly in `post_thread_comments` table
+   - Files are uploaded to appropriate storage bucket
+   - File records are created in `files` table
+   - File attachments link files to comments
+   - Translations are triggered asynchronously
 5. Real-time Updates:
-   - Other users in thread receive update via subscription
+   - Other users receive updates via Supabase real-time subscriptions
    - Parent post thread count updates automatically
-6. Error Handling:
-   - Shows toast notification on success/failure
-   - Handles file upload errors individually
+   - Voice messages are played back with duration and progress tracking
 
-#### Comment Emoji Reaction
-1. Same flow as post reactions
-2. Uses same `emoji_reactions` table with `post_thread_comment_id` instead of `post_id`
-3. Uses same real-time subscription system
-4. Shows reactions in thread view immediately
+### Thread Comments Component (`[channelId]/ThreadComments.tsx`)
 
-#### Comment Edit
-1. Same flow as post edit
-2. Uses same UI components and keyboard shortcuts
-3. Updates `post_thread_comments` table
-4. Triggers translation service
-5. Real-time updates to all thread viewers
+#### Purpose
+Manages thread discussions for individual posts.
 
-#### Comment Delete
-1. Same flow as post delete
-2. Deletes from `post_thread_comments` table
-3. Database triggers handle cascading deletions:
-   - File attachments
-   - Reactions
-   - Translations
-4. Updates thread count on parent post
-5. Real-time updates to thread viewers
-6. Shows toast notification on success/failure
+#### Key Features
+- Thread comment display
+- File attachments in threads
+- Voice message recording/playback
+- Real-time updates
+- Theme support
 
-### Voice Message Flow
-1. User clicks voice message button
+#### Database Operations
+1. Fetching Comments:
+   ```typescript
+   const { data } = await supabase
+     .from('post_thread_comments')
+     .select(`
+       id,
+       user_id,
+       post_id,
+       content,
+       created_at,
+       user:user_id(...),
+       files:file_attachments(
+         file:file_id(...)
+       ),
+       translations(...)
+     `)
+     .eq('post_id', postId)
+     .order('created_at', { ascending: true })
+   ```
+
+2. Creating Comments:
+   ```typescript
+   const { data: commentData } = await supabase
+     .from('post_thread_comments')
+     .insert({
+       post_id: postId,
+       user_id: currentUser.id,
+       content: content,
+       created_at: new Date().toISOString()
+     })
+     .select()
+     .single()
+   ```
+
+3. File Attachments:
+   ```typescript
+   // Upload file
+   await supabase.storage
+     .from('file-uploads')
+     .upload(filePath, file)
+
+   // Create file record
+   const { data: fileData } = await supabase
+     .from('files')
+     .insert({
+       file_name: fileName,
+       file_type: fileType,
+       file_size: fileSize,
+       bucket: bucketName,
+       path: filePath,
+       uploaded_by: userId,
+       duration_seconds: duration // for voice messages
+     })
+     .select()
+     .single()
+
+   // Create file attachment
+   await supabase
+     .from('file_attachments')
+     .insert({
+       file_id: fileData.id,
+       post_thread_comment_id: commentData.id
+     })
+   ```
+
+#### Real-time Subscriptions
+```typescript
+// Comments subscription
+channel.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'post_thread_comments',
+    filter: `post_id=eq.${postId}`
+  },
+  (payload) => {
+    // Handle changes
+  }
+)
+
+// File attachments subscription
+channel.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'file_attachments',
+    filter: `post_thread_comment_id=in.(${commentIds.join(',')})`
+  },
+  (payload) => {
+    // Handle changes
+  }
+)
+```
+
+### Voice Message Flow in Threads
+1. User clicks voice message button in thread
 2. Frontend:
    - Shows voice recorder UI
    - Handles microphone permissions
@@ -250,16 +334,71 @@ interface ThreadComment {
    - Can re-record if needed
 4. Backend Process:
    - Uploads MP3 file to `voice-messages` bucket
-   - Creates file record in `files` table
-   - Creates post record in `posts` table (empty content)
-   - Creates file attachment in `file_attachments` table
+   - Creates file record in `files` table with duration
+   - Creates thread comment with empty content
+   - Creates file attachment linking the voice message
 5. Real-time Updates:
-   - Other users receive post via subscription
+   - Other users receive comment via subscription
    - Voice message appears with playback controls
 6. Error Handling:
    - Shows toast notification on success/failure
    - Handles microphone permission errors
    - Handles upload failures
+
+### Data Types
+
+#### Thread Comment Type
+```typescript
+interface ThreadComment {
+  id: string
+  user_id: string
+  post_id: string
+  content: string
+  created_at: string
+  user: {
+    id: string
+    email: string
+    display_name?: string | null
+    native_language?: string | null
+  }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+    bucket: string
+    duration_seconds?: number
+  }[]
+  translation?: {
+    id: string
+    message_id: string | null
+    conversation_thread_comment_id: string | null
+    post_id: string | null
+    post_thread_comment_id: string | null
+    mandarin_chinese_translation: string | null
+    spanish_translation: string | null
+    english_translation: string | null
+    hindi_translation: string | null
+    arabic_translation: string | null
+    bengali_translation: string | null
+    portuguese_translation: string | null
+    russian_translation: string | null
+    japanese_translation: string | null
+    western_punjabi_translation: string | null
+  } | null
+}
+```
+
+### Best Practices
+1. Always clean up audio resources when component unmounts
+2. Use signed URLs for secure file access
+3. Store actual recording duration for voice messages
+4. Handle all potential error states gracefully
+5. Provide clear feedback to users
+6. Use direct Supabase calls for better performance
+7. Implement proper type safety for database operations
+8. Use real-time subscriptions for immediate updates
 
 ## Components
 
@@ -328,6 +467,7 @@ Manages thread discussions for individual posts.
 #### Key Features
 - Thread comment display
 - File attachments in threads
+- Voice message recording/playback
 - Real-time updates
 - Theme support
 
@@ -1023,3 +1163,211 @@ USING (
 3. Background noise reduction
 4. Transcription support
 5. Message retention policies 
+
+### Thread Comment Flow
+1. User clicks thread icon on a post
+2. Thread view opens in sidebar
+3. User can:
+   - View thread history
+   - Add new comments
+   - Upload files to comments
+   - Record and send voice messages
+   - React with emojis
+4. Data Flow:
+   - Comments are created directly in `post_thread_comments` table
+   - Files are uploaded to appropriate storage bucket
+   - File records are created in `files` table
+   - File attachments link files to comments
+   - Translations are triggered asynchronously
+5. Real-time Updates:
+   - Other users receive updates via Supabase real-time subscriptions
+   - Parent post thread count updates automatically
+   - Voice messages are played back with duration and progress tracking
+
+### Thread Comments Component (`[channelId]/ThreadComments.tsx`)
+
+#### Purpose
+Manages thread discussions for individual posts.
+
+#### Key Features
+- Thread comment display
+- File attachments in threads
+- Voice message recording/playback
+- Real-time updates
+- Theme support
+
+#### Database Operations
+1. Fetching Comments:
+   ```typescript
+   const { data } = await supabase
+     .from('post_thread_comments')
+     .select(`
+       id,
+       user_id,
+       post_id,
+       content,
+       created_at,
+       user:user_id(...),
+       files:file_attachments(
+         file:file_id(...)
+       ),
+       translations(...)
+     `)
+     .eq('post_id', postId)
+     .order('created_at', { ascending: true })
+   ```
+
+2. Creating Comments:
+   ```typescript
+   const { data: commentData } = await supabase
+     .from('post_thread_comments')
+     .insert({
+       post_id: postId,
+       user_id: currentUser.id,
+       content: content,
+       created_at: new Date().toISOString()
+     })
+     .select()
+     .single()
+   ```
+
+3. File Attachments:
+   ```typescript
+   // Upload file
+   await supabase.storage
+     .from('file-uploads')
+     .upload(filePath, file)
+
+   // Create file record
+   const { data: fileData } = await supabase
+     .from('files')
+     .insert({
+       file_name: fileName,
+       file_type: fileType,
+       file_size: fileSize,
+       bucket: bucketName,
+       path: filePath,
+       uploaded_by: userId,
+       duration_seconds: duration // for voice messages
+     })
+     .select()
+     .single()
+
+   // Create file attachment
+   await supabase
+     .from('file_attachments')
+     .insert({
+       file_id: fileData.id,
+       post_thread_comment_id: commentData.id
+     })
+   ```
+
+#### Real-time Subscriptions
+```typescript
+// Comments subscription
+channel.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'post_thread_comments',
+    filter: `post_id=eq.${postId}`
+  },
+  (payload) => {
+    // Handle changes
+  }
+)
+
+// File attachments subscription
+channel.on(
+  'postgres_changes',
+  {
+    event: '*',
+    schema: 'public',
+    table: 'file_attachments',
+    filter: `post_thread_comment_id=in.(${commentIds.join(',')})`
+  },
+  (payload) => {
+    // Handle changes
+  }
+)
+```
+
+### Voice Message Flow in Threads
+1. User clicks voice message button in thread
+2. Frontend:
+   - Shows voice recorder UI
+   - Handles microphone permissions
+   - Provides record/stop controls
+   - Shows preview playback
+3. User records message:
+   - Can preview before sending
+   - Can cancel recording
+   - Can re-record if needed
+4. Backend Process:
+   - Uploads MP3 file to `voice-messages` bucket
+   - Creates file record in `files` table with duration
+   - Creates thread comment with empty content
+   - Creates file attachment linking the voice message
+5. Real-time Updates:
+   - Other users receive comment via subscription
+   - Voice message appears with playback controls
+6. Error Handling:
+   - Shows toast notification on success/failure
+   - Handles microphone permission errors
+   - Handles upload failures
+
+### Data Types
+
+#### Thread Comment Type
+```typescript
+interface ThreadComment {
+  id: string
+  user_id: string
+  post_id: string
+  content: string
+  created_at: string
+  user: {
+    id: string
+    email: string
+    display_name?: string | null
+    native_language?: string | null
+  }
+  files?: {
+    id: string
+    file_name: string
+    file_type: string
+    file_size: number
+    path: string
+    bucket: string
+    duration_seconds?: number
+  }[]
+  translation?: {
+    id: string
+    message_id: string | null
+    conversation_thread_comment_id: string | null
+    post_id: string | null
+    post_thread_comment_id: string | null
+    mandarin_chinese_translation: string | null
+    spanish_translation: string | null
+    english_translation: string | null
+    hindi_translation: string | null
+    arabic_translation: string | null
+    bengali_translation: string | null
+    portuguese_translation: string | null
+    russian_translation: string | null
+    japanese_translation: string | null
+    western_punjabi_translation: string | null
+  } | null
+}
+```
+
+### Best Practices
+1. Always clean up audio resources when component unmounts
+2. Use signed URLs for secure file access
+3. Store actual recording duration for voice messages
+4. Handle all potential error states gracefully
+5. Provide clear feedback to users
+6. Use direct Supabase calls for better performance
+7. Implement proper type safety for database operations
+8. Use real-time subscriptions for immediate updates 
