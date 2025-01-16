@@ -1,7 +1,7 @@
 # Direct Messages Directory Documentation
 
 ## Overview
-The Direct Messages (DM) directory contains components and functionality for handling one-on-one and group messaging in the Slack clone application. It implements real-time messaging, thread discussions, file attachments, message translations, and read receipts.
+The Direct Messages (DM) directory contains components and functionality for handling one-on-one and group messaging in the Slack clone application. It implements real-time messaging, thread discussions, file attachments, voice messages, message translations, and read receipts.
 
 ## Directory Structure
 ```
@@ -9,7 +9,7 @@ app/dm/
 ├── [id]/
 │   └── page.tsx                      # Main DM conversation page component
 ├── MessageItem.tsx                   # Individual message component
-├── ConversationThreadComments.tsx    # Thread discussion component
+├── ConversationThreadComments.tsx    # Thread discussion component with voice notes
 ├── ConversationThreadCommentItem.tsx # Individual thread comment component
 └── StartChatModal.tsx               # Modal for starting new conversations
 ```
@@ -58,6 +58,8 @@ interface FileAttachment {
   file_type: string
   file_size: number
   path: string
+  bucket: string
+  duration_seconds?: number
 }
 
 // Translation
@@ -143,10 +145,16 @@ interface Conversation {
    - View thread history
    - Add new comments
    - Upload files to comments
+   - Record voice messages
    - React with emojis
 4. Real-time Updates:
    - Other users in thread receive updates via subscription
    - Parent message thread count updates automatically
+5. Voice Messages in Threads:
+   - Same functionality as main messages
+   - Records duration for playback
+   - Shows audio player UI
+   - Supports preview before sending
 
 ### Read Receipt Flow
 1. User opens conversation
@@ -201,15 +209,37 @@ Manages thread discussions for individual messages.
 #### Key Features
 - Thread comment display
 - File attachments in threads
+- Voice message recording/playback
 - Real-time updates
 - Emoji reactions
+- Translation support
 
-#### API Endpoints Used
-- `GET /api/conversation-thread-comments?messageId={messageId}` - Fetch thread comments
-- `POST /api/conversation-thread-comments` - Create new thread comment
+#### Database Operations
+All database operations are handled directly in the component using Supabase client:
+- Fetching thread comments with translations and files
+- Creating new comments
+- Uploading files and voice messages
+- Managing file attachments
+- Triggering translations
 
 #### Key Functions
-1. `setupRealtimeSubscription()`
+1. `fetchComments()`
+   - Fetches thread comments with user info, files, and translations
+   - Transforms data to match component types
+
+2. `handleSubmit(e: React.FormEvent)`
+   - Handles comment submission
+   - Manages file uploads
+   - Creates comment records
+   - Links file attachments
+
+3. `handleVoiceRecordingComplete(audioBlob: Blob, duration: number)`
+   - Processes voice message recordings
+   - Uploads to voice-messages bucket
+   - Creates file and comment records
+   - Handles translations
+
+4. `setupRealtimeSubscription()`
    - Manages real-time updates for comments
    - Handles file attachment changes
    - Updates thread state
@@ -222,6 +252,7 @@ Renders individual comments within a thread discussion.
 #### Key Features
 - Comment display with user information
 - File attachment display
+- Voice message playback
 - Translation support
 - Online user status integration
 
@@ -275,24 +306,33 @@ CREATE TABLE conversation_thread_comments (
 );
 ```
 
-### Conversations Table
+### Files Table
 ```sql
-CREATE TABLE conversations (
+CREATE TABLE files (
     id UUID PRIMARY KEY,
-    type TEXT CHECK (type IN ('dm', 'group')),
-    name TEXT,
-    created_at TIMESTAMPTZ
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    bucket TEXT NOT NULL,
+    path TEXT NOT NULL,
+    uploaded_by UUID REFERENCES users(id),
+    duration_seconds INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-### Conversation Participants Table
+### File Attachments Table
 ```sql
-CREATE TABLE conversation_participants (
-    conversation_id UUID REFERENCES conversations(id),
-    user_id UUID REFERENCES users(id),
-    created_at TIMESTAMPTZ,
-    last_read_at TIMESTAMPTZ,
-    PRIMARY KEY (conversation_id, user_id)
+CREATE TABLE file_attachments (
+    id UUID PRIMARY KEY,
+    file_id UUID REFERENCES files(id),
+    message_id UUID REFERENCES messages(id),
+    conversation_thread_comment_id UUID REFERENCES conversation_thread_comments(id),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT one_parent_only CHECK (
+        (message_id IS NOT NULL AND conversation_thread_comment_id IS NULL) OR
+        (message_id IS NULL AND conversation_thread_comment_id IS NOT NULL)
+    )
 );
 ```
 
@@ -364,87 +404,12 @@ channel.on(
 )
 ```
 
-## API Request/Response Formats
-
-### Message Operations
-Messages are handled directly through Supabase connections rather than API routes. Here are the key operations:
-
-#### Create Message
-```typescript
-// Insert message
-const { data, error } = await supabase
-  .from('messages')
-  .insert({
-    conversation_id: string,
-    sender_id: string,
-    content: string,
-    created_at: string
-  })
-  .select()
-```
-
-#### Fetch Messages
-```typescript
-const { data, error } = await supabase
-  .from('messages')
-  .select(`
-    id,
-    content,
-    created_at,
-    sender:sender_id(
-      id,
-      email,
-      display_name,
-      native_language
-    ),
-    files:file_attachments(
-      id,
-      file:file_id(
-        id,
-        file_name,
-        file_type,
-        file_size,
-        path
-      )
-    ),
-    translations(*)
-  `)
-  .eq('conversation_id', conversationId)
-  .order('created_at', { ascending: true })
-```
-
-### Thread Comments API Endpoints
-
-#### Fetch Thread Comments
-```typescript
-GET /api/conversation-thread-comments?messageId={messageId}
-
-Response: ThreadComment[]
-```
-
-#### Create Thread Comment
-```typescript
-POST /api/conversation-thread-comments
-{
-  messageId: string
-  conversationId: string
-  userId: string
-  content: string
-}
-
-Response: {
-  id: string
-  content: string
-  created_at: string
-  user_id: string
-}
-```
-
 ## Error Handling
 
 The application implements comprehensive error handling for:
 - Failed message sends
 - File upload errors
+- Voice recording errors
 - Network issues
 - Authentication errors
 - Real-time subscription failures
