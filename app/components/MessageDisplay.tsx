@@ -680,54 +680,108 @@ export default function MessageDisplay({
               })}
             </div>
           )}
-        </div>
-        <div className="flex justify-between items-center mt-1">
+          
           {/* Emoji Reactions */}
-          <div className="flex flex-wrap gap-1 mt-1">
-            {Object.entries(groupedReactions).map(([emoji, reactions]) => {
-              const hasUserReacted = reactions.some(r => r.user_id === currentUser?.id);
-              // Get just the display names for each user who reacted
-              const reactingUsers = reactions
-                .map(r => {
-                  if (r.user_id === currentUser?.id) {
-                    return currentUser.display_name || 'You';
-                  }
-                  const user = reactionUsers[r.user_id];
-                  return user?.display_name || user?.email?.split('@')[0] || 'Unknown user';
-                })
-                .join(', ');
+          {Object.keys(groupedReactions).length > 0 && (
+            <div className="flex flex-wrap items-center gap-1 mt-2">
+              {Object.entries(groupedReactions).map(([emoji, reactions]) => {
+                const hasUserReacted = reactions.some(r => r.user_id === currentUser?.id);
+                // Get just the display names for each user who reacted
+                const reactingUsers = reactions
+                  .map(r => {
+                    if (r.user_id === currentUser?.id) {
+                      return currentUser.display_name || 'You';
+                    }
+                    const user = reactionUsers[r.user_id];
+                    return user?.display_name || user?.email?.split('@')[0] || 'Unknown user';
+                  })
+                  .join(', ');
+                
+                return (
+                  <TooltipProvider key={emoji}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`h-8 px-3 py-1 text-sm rounded-full bg-opacity-25 ${
+                            hasUserReacted ? `${theme.colors.background} bg-opacity-25` : 'hover:bg-accent'
+                          }`}
+                          onClick={() => {
+                            const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                            if (userReaction) {
+                              handleRemoveReaction(userReaction.id);
+                            } else {
+                              handleAddReaction(emoji);
+                            }
+                          }}
+                        >
+                          <span className="mr-1.5 text-base">{emoji}</span>
+                          <span>{reactions.length}</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center" sideOffset={5} className="p-2 z-[9999]">
+                        <p className="text-sm">{reactingUsers}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              })}
               
-              return (
-                <TooltipProvider key={emoji}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
+              {/* Add reaction button at the end of existing reactions */}
+              {currentUser && !hideActions && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3 py-1 text-sm rounded-full hover:bg-accent"
+                    >
+                      <Smile className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2">
+                    {/* Emoji Grid */}
+                    <div className="grid grid-cols-10 gap-1 mb-2">
+                      {EMOJI_PAGES[currentPage].map((emoji) => (
+                        <Button
+                          key={emoji}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-accent"
+                          onClick={() => handleAddReaction(emoji)}
+                        >
+                          {emoji}
+                        </Button>
+                      ))}
+                    </div>
+                    {/* Pagination Controls */}
+                    <div className="flex justify-between items-center border-t pt-2">
                       <Button
                         size="sm"
-                        variant="outline"
-                        className={`h-8 px-3 py-1 text-sm rounded-full bg-opacity-25 ${
-                          hasUserReacted ? `${theme.colors.background} bg-opacity-25` : 'hover:bg-accent'
-                        }`}
-                        onClick={() => {
-                          const userReaction = reactions.find(r => r.user_id === currentUser?.id);
-                          if (userReaction) {
-                            handleRemoveReaction(userReaction.id);
-                          } else {
-                            handleAddReaction(emoji);
-                          }
-                        }}
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : EMOJI_PAGES.length - 1))}
                       >
-                        <span className="mr-1.5 text-base">{emoji}</span>
-                        <span>{reactions.length}</span>
+                        <ChevronLeft className="h-4 w-4" />
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" align="center" sideOffset={5} className="p-2 z-[9999]">
-                      <p className="text-sm">{reactingUsers}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              );
-            })}
-          </div>
+                      <span className="text-xs text-gray-500">
+                        Page {currentPage + 1} of {EMOJI_PAGES.length}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage((prev) => (prev < EMOJI_PAGES.length - 1 ? prev + 1 : 0))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
