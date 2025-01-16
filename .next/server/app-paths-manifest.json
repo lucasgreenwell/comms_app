@@ -2,6 +2,5 @@
   "/dm/[id]/page": "app/dm/[id]/page.js",
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
   "/profile/login/page": "app/profile/login/page.js",
-  "/api/bot-messages/route": "app/api/bot-messages/route.js",
   "/api/translations/route": "app/api/translations/route.js"
 }

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useUser } from '../hooks/useUser'
 import MessageDisplay from '../components/MessageDisplay'
 import { usePresence } from '../hooks/usePresence'
+import type { Translation } from '../types/entities/Translation'
+import type { FileAttachment } from '../types/entities/FileAttachment'
 
 interface ThreadComment {
   id: string
@@ -15,13 +17,8 @@ interface ThreadComment {
     email: string
     display_name?: string | null
   }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
+  files?: FileAttachment[]
+  translation: Translation | null
 }
 
 interface ConversationThreadCommentItemProps {
@@ -45,6 +42,7 @@ export default function ConversationThreadCommentItem({ comment, onCommentUpdate
       onUpdate={onCommentUpdate}
       tableName="conversation_thread_comments"
       created_at={comment.created_at}
+      translation={comment.translation}
     />
   )
 } 

@@ -232,6 +232,21 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
       }
     )
 
+    // Listen for translation changes
+    if (comments.length > 0) {
+      channel = channel.on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'translations',
+          filter: `post_thread_comment_id=in.(${comments.map(c => c.id).join(',')})`
+        },
+        () => {
+          fetchComments()
+        }
+      )
+    }
+
     channel.subscribe()
 
     return () => {

@@ -13,6 +13,7 @@ import MessageDisplay from '../components/MessageDisplay'
 import VoiceRecorder from '../components/VoiceRecorder'
 import MessageInput from '../components/MessageInput'
 import type { Translation } from '../types/entities/Translation'
+import type { FileAttachment } from '../types/entities/FileAttachment'
 
 interface ThreadComment {
   id: string
@@ -27,15 +28,7 @@ interface ThreadComment {
     display_name?: string | null
     native_language?: string | null
   }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-    bucket: string
-    duration_seconds?: number
-  }[]
+  files?: FileAttachment[]
   translation: Translation | null
 }
 
@@ -269,6 +262,21 @@ export default function ConversationThreadComments({ messageId, conversationId, 
         fetchComments()
       }
     )
+
+    // Listen for translation changes
+    if (comments.length > 0) {
+      channel = channel.on('postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'translations',
+          filter: `conversation_thread_comment_id=in.(${comments.map(c => c.id).join(',')})`
+        },
+        () => {
+          fetchComments()
+        }
+      )
+    }
 
     channel.subscribe()
 

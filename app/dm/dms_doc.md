@@ -10,7 +10,7 @@ app/dm/
 │   └── page.tsx                      # Main DM conversation page component
 ├── MessageItem.tsx                   # Individual message component
 ├── ConversationThreadComments.tsx    # Thread discussion component with voice notes
-├── ConversationThreadCommentItem.tsx # Individual thread comment component
+├── ConversationThreadCommentItem.tsx # Individual thread comment component with translations
 └── StartChatModal.tsx               # Modal for starting new conversations
 ```
 
@@ -150,11 +150,18 @@ interface Conversation {
 4. Real-time Updates:
    - Other users in thread receive updates via subscription
    - Parent message thread count updates automatically
+   - Translation updates are received in real-time
 5. Voice Messages in Threads:
    - Same functionality as main messages
    - Records duration for playback
    - Shows audio player UI
    - Supports preview before sending
+6. Translation in Threads:
+   - Thread comments support translations like main messages
+   - Translations are fetched with comment data
+   - Translations update in real-time via subscription
+   - Hover over message to see translation tooltip
+   - Respects user's native language preference
 
 ### Read Receipt Flow
 1. User opens conversation
@@ -243,6 +250,7 @@ All database operations are handled directly in the component using Supabase cli
    - Manages real-time updates for comments
    - Handles file attachment changes
    - Updates thread state
+   - Handles translation updates
 
 ### 3. ConversationThreadCommentItem Component (`ConversationThreadCommentItem.tsx`)
 
@@ -253,8 +261,9 @@ Renders individual comments within a thread discussion.
 - Comment display with user information
 - File attachment display
 - Voice message playback
-- Translation support
+- Translation support with hover tooltip
 - Online user status integration
+- Real-time translation updates
 
 ### 4. StartChatModal Component (`StartChatModal.tsx`)
 
@@ -396,10 +405,10 @@ channel.on(
     event: '*',
     schema: 'public',
     table: 'translations',
-    filter: `message_id=eq.${messageId}`
+    filter: `conversation_thread_comment_id=eq.${commentId}`
   },
   (payload) => {
-    fetchMessages()
+    fetchComments()
   }
 )
 ```
@@ -413,6 +422,7 @@ The application implements comprehensive error handling for:
 - Network issues
 - Authentication errors
 - Real-time subscription failures
+- Translation service errors
 
 Each error is caught and displayed to the user via toast notifications.
 
