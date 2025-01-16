@@ -4,10 +4,12 @@ This document outlines the storage buckets used in our application and their int
 
 ## Storage Buckets
 
-We maintain two separate storage buckets in Supabase:
+We maintain four separate storage buckets in Supabase:
 
 1. `profile-pics`
 2. `file-uploads`
+3. `tts_recordings`
+4. `voice-messages`
 
 ### profile-pics Bucket
 
@@ -48,21 +50,68 @@ This bucket handles general file attachments in conversations and channels.
    - And channel threads (`app/channel/[channelId]/ThreadComments.tsx`)
    - Support file attachments in threaded discussions
 
+### tts_recordings Bucket
+
+This bucket stores text-to-speech audio files generated from various content types.
+
+#### Usage Locations:
+
+1. **Edge Function (`process-tts`)**
+   - Stores TTS audio files generated from posts, messages, and comments
+   - File naming convention: `{content_type}_{content_id}.mp3`
+   - Supports upsert operations to replace failed recordings
+   - Files are referenced in the `tts_recordings` table
+
+2. **Message Display Components**
+   - `MessageDisplay.tsx` and related components fetch and play TTS recordings
+   - Provides accessibility features through audio playback
+   - Handles streaming of audio content
+
+#### Content Types:
+- Posts
+- Messages
+- Post thread comments
+- Conversation thread comments
+
+### voice-messages Bucket
+
+This bucket stores user-recorded voice messages and audio recordings.
+
+#### Usage Locations:
+
+1. **Voice Recorder (`app/components/VoiceRecorder.tsx`)**
+   - Handles recording and uploading of voice messages
+   - File naming convention: `{userId}/{timestamp}.webm`
+   - Supports WebM audio format for optimal compression
+
+2. **Voice Message Player (`app/components/VoiceMessage.tsx`)**
+   - Manages playback of voice messages
+   - Handles streaming and buffering of audio content
+   - Provides playback controls and progress tracking
+
+3. **Message Components**
+   - Integration in direct messages and channels
+   - Support for voice messages in thread comments
+   - Handles voice message attachments like other file types
+
 ## Common Operations
 
 ### File Upload
-- Both buckets support upsert operations
+- All buckets support upsert operations
 - Files are typically stored with unique identifiers or paths
 - Content types are properly set during upload
+- Audio files use appropriate compression formats
 
 ### File Access
-- Both buckets generate public URLs for stored files
+- All buckets generate public URLs for stored files
 - Downloads are handled through the Supabase storage client
 - Access control is managed through Supabase policies
+- Audio streaming is optimized for different network conditions
 
 ### File Deletion
 - File deletion is restricted to file owners/uploaders
 - Includes cleanup of storage items when associated content is deleted
+- TTS recordings are managed by the system and cleaned up automatically
 
 ## Security Considerations
 
@@ -70,6 +119,7 @@ This bucket handles general file attachments in conversations and channels.
 - File deletions are restricted to original uploaders
 - Public URLs are used for serving content
 - Error handling is implemented across all storage operations
+- Audio content is properly sanitized and validated
 
 ## Best Practices
 
@@ -77,4 +127,6 @@ This bucket handles general file attachments in conversations and channels.
 2. Clean up files when associated content is deleted
 3. Validate file types and sizes before upload
 4. Use appropriate file naming conventions for each bucket
-5. Implement proper access control through Supabase policies 
+5. Implement proper access control through Supabase policies
+6. Use appropriate audio formats and compression for voice content
+7. Handle audio streaming efficiently to optimize bandwidth usage 
