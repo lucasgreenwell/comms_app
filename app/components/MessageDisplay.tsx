@@ -607,7 +607,7 @@ export default function MessageDisplay({
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-sm whitespace-pre-wrap break-words mt-1">{content}</div>
+                <div className="text-sm whitespace-pre-wrap break-words mt-1" dangerouslySetInnerHTML={{ __html: content }}></div>
               </TooltipTrigger>
               {getTranslatedContent() && (
                 <TooltipContent
