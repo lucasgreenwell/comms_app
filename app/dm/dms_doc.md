@@ -90,22 +90,50 @@ interface Conversation {
 ## User Interaction Flows
 
 ### Message Creation Flow
-1. User enters message content and/or selects files
+1. User enters message content and/or selects files, or records a voice message
 2. Frontend:
    - Creates message record in `messages` table
    - Uploads any attached files to Supabase storage
-   - Creates file records in `files` table
+   - Creates file records in `files` table with duration for voice messages
    - Links files to message in `file_attachments` table
 3. Real-time Updates:
    - Other users receive message via Supabase real-time subscription
-   - Translation service processes the message
+   - Translation service processes text messages
    - Users receive translation updates via subscription
    - Unread counts are updated for other participants
 
+### Voice Message Flow
+1. User clicks voice message button
+2. Frontend:
+   - Shows voice recorder UI
+   - Handles microphone permissions
+   - Provides record/stop controls
+   - Shows preview playback
+3. User records message:
+   - Can preview before sending
+   - Can cancel recording
+   - Can re-record if needed
+4. Backend Process:
+   - Uploads MP3 file to `voice-messages` bucket
+   - Creates file record in `files` table with duration
+   - Creates message with empty content
+   - Creates file attachment linking the voice message
+5. Real-time Updates:
+   - Other users receive message via subscription
+   - Voice message appears with playback controls
+6. Error Handling:
+   - Shows toast notification on success/failure
+   - Handles microphone permission errors
+   - Handles upload failures
+
 ### File Upload Flow
-1. User selects files through the UI
-2. Files are uploaded to Supabase storage
-3. File records are created in the `files` table
+1. User selects files through the UI or records a voice message
+2. Files are uploaded to appropriate Supabase storage bucket:
+   - Regular files go to 'file-uploads'
+   - Voice messages go to 'voice-messages'
+3. File records are created in the `files` table with:
+   - Basic metadata (name, type, size, path)
+   - Additional fields for voice messages (duration_seconds)
 4. File attachments are linked to messages/comments
 
 ### Thread Comment Flow
@@ -139,6 +167,7 @@ Main component for displaying and managing direct message conversations.
 #### Key Features
 - Real-time messaging
 - File attachments
+- Voice message recording/playback
 - Message threading
 - Online presence indicators
 - Read receipts
@@ -150,11 +179,17 @@ Main component for displaying and managing direct message conversations.
    - Manages file uploads
    - Updates read receipts
 
-2. `setupRealtimeSubscription()`
+2. `handleVoiceRecordingComplete(audioBlob: Blob, duration: number)`
+   - Handles voice message recording completion
+   - Uploads audio file to voice-messages bucket
+   - Creates file record with duration
+   - Creates message and file attachment
+
+3. `setupRealtimeSubscription()`
    - Sets up real-time listeners for messages and files
    - Manages Supabase channel subscriptions
 
-3. `updateLastReadTimestamp()`
+4. `updateLastReadTimestamp()`
    - Updates read receipts
    - Manages unread message counts
 

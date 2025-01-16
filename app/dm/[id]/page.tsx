@@ -7,46 +7,17 @@ import { usePresence } from '../../hooks/usePresence'
 import MessageItem from '../MessageItem'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
 import ConversationThreadComments from '../ConversationThreadComments'
-import { Paperclip, X } from 'lucide-react'
+import { Paperclip, X, Mic } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from 'next/navigation'
 import UserDisplay from '../../components/UserDisplay'
-
-interface Translation {
-  id: string
-  message_id: string | null
-  conversation_thread_comment_id: string | null
-  mandarin_chinese_translation: string | null
-  spanish_translation: string | null
-  english_translation: string | null
-  hindi_translation: string | null
-  arabic_translation: string | null
-  bengali_translation: string | null
-  portuguese_translation: string | null
-  russian_translation: string | null
-  japanese_translation: string | null
-  western_punjabi_translation: string | null
-}
-
-interface Message {
-  id: string
-  content: string
-  created_at: string
-  sender: {
-    id: string
-    email: string
-    display_name?: string | null
-  }
-  files?: {
-    id: string
-    file_name: string
-    file_type: string
-    file_size: number
-    path: string
-  }[]
-  translation: Translation | null
-}
+import VoiceRecorder from '../../components/VoiceRecorder'
+import type { Message } from '../../types/entities/Message'
+import type { Translation } from '../../types/entities/Translation'
+import type { FileAttachment } from '../../types/entities/FileAttachment'
+import type { User } from '../../types/entities/User'
+import type { Conversation } from '../../types/entities/Conversation'
 
 interface FileUpload {
   id: string
@@ -57,17 +28,19 @@ interface FileUpload {
   uploaded_by: string
 }
 
-interface Conversation {
-  id: string
-  type: 'dm' | 'group'
-  name: string | null
+type DbMessage = {
+  id: string;
+  content: string;
+  created_at: string;
+  sender: User | User[];
+  files: {
+    id: string;
+    file: FileAttachment;
+  }[] | null;
+  translations: Translation[] | null;
 }
 
-interface Participant {
-  id: string
-  email: string
-  display_name?: string | null
-}
+type Participant = User;
 
 export default function DirectMessagePage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -81,6 +54,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [activeThread, setActiveThread] = useState<{
     messageId: string;
     content: string;
+    created_at: string;
     sender: {
       id: string;
       email: string;
@@ -90,6 +64,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
 
   useEffect(() => {
     fetchMessages()
@@ -162,6 +137,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         setActiveThread({
           messageId: message.id,
           content: message.content,
+          created_at: message.created_at,
           sender: message.sender
         })
       }
@@ -281,6 +257,8 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           file_type: string;
           file_size: number;
           path: string;
+          bucket: string;
+          duration_seconds?: number;
         };
       }[] | null;
       translations: {
@@ -319,7 +297,9 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             file_name,
             file_type,
             file_size,
-            path
+            path,
+            bucket,
+            duration_seconds
           )
         ),
         translations(
@@ -357,10 +337,12 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
         file_name: f.file.file_name,
         file_type: f.file.file_type,
         file_size: f.file.file_size,
-        path: f.file.path
-      })),
+        path: f.file.path,
+        bucket: f.file.bucket,
+        duration_seconds: f.file.duration_seconds
+      })) as FileAttachment[],
       translation: msg.translations?.[0] || null
-    })) || []
+    })) as Message[]
 
     setMessages(transformedMessages)
   }
@@ -513,6 +495,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
   const handleThreadOpen = (message: {
     id: string;
     content: string;
+    created_at: string;
     sender: {
       id: string;
       email: string;
@@ -525,6 +508,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
     setActiveThread({
       messageId: message.id,
       content: message.content,
+      created_at: message.created_at,
       sender: message.sender
     })
   }
@@ -573,6 +557,80 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
       updateLastReadTimestamp()
     }
   }, [messages])
+
+  const handleVoiceRecordingComplete = async (audioBlob: Blob, duration: number) => {
+    try {
+      const supabase = getSupabase()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Generate unique filename for the audio file
+      const fileName = `${Math.random().toString(36).substring(2)}.mp3`
+      const filePath = `${user.id}/${fileName}`
+
+      // Upload audio file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('voice-messages')
+        .upload(filePath, audioBlob)
+
+      if (uploadError) throw uploadError
+
+      // Create file record with duration
+      const { data: fileData, error: fileRecordError } = await supabase
+        .from('files')
+        .insert({
+          file_name: fileName,
+          file_type: 'audio/mp3',
+          file_size: audioBlob.size,
+          bucket: 'voice-messages',
+          path: filePath,
+          uploaded_by: user.id,
+          duration_seconds: duration
+        })
+        .select()
+        .single()
+
+      if (fileRecordError) throw fileRecordError
+
+      // Create message with empty content (since it's a voice message)
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          content: '',
+          conversation_id: params.id,
+          sender_id: user.id
+        })
+        .select()
+        .single()
+
+      if (messageError) throw messageError
+
+      // Create file attachment
+      const { error: attachmentError } = await supabase
+        .from('file_attachments')
+        .insert({
+          file_id: fileData.id,
+          message_id: messageData.id
+        })
+
+      if (attachmentError) throw attachmentError
+
+      // Hide voice recorder and show success message
+      setShowVoiceRecorder(false)
+      toast({
+        title: "Voice message sent",
+        description: "Your voice message has been sent successfully."
+      })
+
+    } catch (error) {
+      console.error('Error sending voice message:', error)
+      toast({
+        variant: "destructive",
+        title: "Error sending voice message",
+        description: "There was an error sending your voice message. Please try again."
+      })
+    }
+  }
 
   return (
     <div className="flex h-full">
@@ -638,6 +696,14 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             >
               <Paperclip className="h-4 w-4" />
             </Button>
+            <Button 
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setShowVoiceRecorder(true)}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
             <Button type="submit">
               Send
             </Button>
@@ -667,6 +733,14 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
               ))}
             </div>
           )}
+          {showVoiceRecorder && (
+            <div className="mt-2">
+              <VoiceRecorder
+                onRecordingComplete={handleVoiceRecordingComplete}
+                onCancel={() => setShowVoiceRecorder(false)}
+              />
+            </div>
+          )}
         </form>
       </div>
       {activeThread && (
@@ -676,6 +750,7 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
           originalMessage={{
             id: activeThread.messageId,
             content: activeThread.content,
+            created_at: activeThread.created_at,
             sender: activeThread.sender
           }}
           onClose={handleThreadClose}
