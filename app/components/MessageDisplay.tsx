@@ -575,7 +575,12 @@ export default function MessageDisplay({
                 <Button 
                   size="sm" 
                   variant="ghost" 
-                  onClick={() => onThreadOpen({ id, content, user })}
+                  onClick={() => onThreadOpen({ 
+                    id, 
+                    content, 
+                    created_at,
+                    sender: user 
+                  })}
                   className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
                 >
                   <Waves className="h-4 w-4" />
