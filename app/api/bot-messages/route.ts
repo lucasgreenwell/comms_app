@@ -13,9 +13,34 @@ const supabase = createClient(
 
 const BOT_USER_ID = '54296b9b-091e-4a19-b5b9-b890c24c1912'
 
+interface UserLanguageData {
+  native_language: string
+  language_preference: {
+    language: string
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { content, conversationId, senderId } = await request.json()
+
+    // Get user's language preference
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select(`
+        native_language,
+        language_preference:top_languages!users_native_language_fkey (
+          language
+        )
+      `)
+      .eq('id', senderId)
+      .single()
+
+    if (userError) {
+      throw new Error(`Error fetching user data: ${JSON.stringify(userError)}`)
+    }
+
+    const typedUserData = userData as unknown as UserLanguageData
 
     // Generate embedding for the user's message
     const embedding = await openai.embeddings.create({
@@ -52,10 +77,11 @@ export async function POST(request: Request) {
                 locationInfo += ` (thread reply to message ${item.parent_id})`
               }
             }
-            return `[${index + 1}] ${item.display_name} ${locationInfo}: ${item.content} (similarity: ${item.similarity.toFixed(3)})`
+            return `[${index + 1}] ${item.display_name} ${locationInfo} at ${new Date(item.created_at).toLocaleString()}: ${item.content} (similarity: ${item.similarity.toFixed(3)})`
           })
           .join('\n')
       : "No relevant context found."
+
 
     // Get chat completion from OpenAI
     const completion = await openai.chat.completions.create({
@@ -63,7 +89,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: "You are a helpful AI assistant in a chat application. Use the provided context to help answer the user's question. If no relevant context is found, respond based on your general knowledge. Keep responses concise and friendly. Your response must be a valid JSON object with two fields: 'response' (your text response) and 'relevant_sources' (an array of indices of the provided sources that contained the information requested by the user). If there are multiple sources used, include all of them in the relevant_sources array. Exclude any sources that are not relevant to the user's question."
+          content: `You are a helpful AI assistant in a chat application. Use the provided context to help answer the user's question. If no relevant context is found, respond based on your general knowledge. Keep responses concise and friendly. You should respond in ${typedUserData.language_preference?.language || 'English'} language. Your response must be a valid JSON object with two fields: 'response' (your text response) and 'relevant_sources' (an array of indices of the provided sources that contained the information requested by the user). If there are multiple sources used, include all of them in the relevant_sources array. Exclude any sources that are not relevant to the user's question.`
         },
         {
           role: "user",

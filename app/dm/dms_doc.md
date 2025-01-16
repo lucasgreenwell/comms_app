@@ -448,15 +448,20 @@ The bot's RAG system respects user permissions:
 
 ### Message Flow
 1. User sends message to bot
-2. System generates embedding for user's message
+2. System:
+   - Fetches user's language preference from top_languages table (using language name)
+   - Generates embedding for user's message
 3. Vector similarity search finds relevant content
-4. Content is formatted with source information
+4. Content is formatted with:
+   - Source information
+   - Creation timestamps
+   - Location context (channel/DM)
 5. GPT-4 generates response using:
    - Retrieved context
    - User's message
-   - System prompt
+   - System prompt (in user's preferred language)
 6. Response includes:
-   - Bot's answer
+   - Bot's answer (in user's preferred language)
    - Clickable source links to relevant content
    - Similarity scores for transparency
 
@@ -466,6 +471,7 @@ Bot responses include clickable source links that:
 - Support different content types (posts, threads, DMs)
 - Include thread context when applicable
 - Open in new tabs for easy reference
+- Show creation timestamps for context
 
 ### Database Function
 The match_all_content function handles RAG queries with:
@@ -474,16 +480,18 @@ The match_all_content function handles RAG queries with:
 - Content type identification
 - Relevance scoring
 - Source metadata
+- Timestamp information
 
 ### Response Format
 Bot messages are structured as:
-1. Main response text
+1. Main response text (in user's preferred language, using full language name)
 2. Source references (if relevant content found)
 3. Clickable links to source content
-4. Similarity scores for transparency
+4. Similarity scores and timestamps for transparency
 
 ### Integration Points
 - MessageInput component checks for bot conversations
 - Sends messages to /api/bot-messages endpoint
 - Handles bot responses via real-time subscriptions
-- Displays bot messages with source links 
+- Displays bot messages with source links
+- Respects user's language preferences from profile settings (using language name instead of code) 
