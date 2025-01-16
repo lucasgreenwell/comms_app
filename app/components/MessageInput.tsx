@@ -33,6 +33,7 @@ export default function MessageInput({
   const [newMessage, setNewMessage] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
+  const [isBotTyping, setIsBotTyping] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -158,6 +159,9 @@ export default function MessageInput({
       const isBotConversation = participants.some(p => p.id === '54296b9b-091e-4a19-b5b9-b890c24c1912')
       
       if (isBotConversation && messageType === 'dm') {
+        // Show bot typing indicator
+        setIsBotTyping(true)
+        
         // Send message to bot API
         const botResponse = await fetch('/api/bot-messages', {
           method: 'POST',
@@ -174,6 +178,9 @@ export default function MessageInput({
         if (!botResponse.ok) {
           throw new Error('Failed to get bot response')
         }
+
+        // Hide bot typing indicator
+        setIsBotTyping(false)
       }
 
       toast({
@@ -185,6 +192,7 @@ export default function MessageInput({
       await triggerTranslation(messageData.id, user.id)
 
     } catch (error) {
+      setIsBotTyping(false)
       console.error('Error sending message:', error)
       toast({
         variant: "destructive",
@@ -308,65 +316,77 @@ export default function MessageInput({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={`space-y-2 ${className}`}>
-      <div className="flex gap-2">
-        <Input
-          type="text"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder={placeholder}
-          className="flex-1"
-        />
-        <Button 
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => setShowVoiceRecorder(true)}
-          className="w-10 h-10"
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
-        <Button 
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Paperclip className="h-4 w-4" />
-        </Button>
-        <Button type="submit">Send</Button>
-      </div>
-      {showVoiceRecorder && (
-        <VoiceRecorder
-          onRecordingComplete={handleVoiceRecordingComplete}
-          onCancel={() => setShowVoiceRecorder(false)}
-        />
-      )}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelect}
-        className="hidden"
-        multiple
-      />
-      {selectedFiles.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {selectedFiles.map((file, index) => (
-            <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-              <span className="text-sm truncate max-w-[200px]">{file.name}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0"
-                onClick={() => removeFile(index)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
+    <div className="space-y-2">
+      {isBotTyping && (
+        <div className="text-sm text-muted-foreground flex items-center gap-1 mb-2">
+          <span>Bot is typing</span>
+          <span className="inline-flex">
+            <span className="animate-bounce">.</span>
+            <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>.</span>
+            <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>.</span>
+          </span>
         </div>
       )}
-    </form>
+      <form onSubmit={handleSubmit} className={`space-y-2 ${className}`}>
+        <div className="flex gap-2">
+          <Input
+            type="text"
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            placeholder={placeholder}
+            className="flex-1"
+          />
+          <Button 
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => setShowVoiceRecorder(true)}
+            className="w-10 h-10"
+          >
+            <Mic className="h-4 w-4" />
+          </Button>
+          <Button 
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+          <Button type="submit">Send</Button>
+        </div>
+        {showVoiceRecorder && (
+          <VoiceRecorder
+            onRecordingComplete={handleVoiceRecordingComplete}
+            onCancel={() => setShowVoiceRecorder(false)}
+          />
+        )}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          className="hidden"
+          multiple
+        />
+        {selectedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedFiles.map((file, index) => (
+              <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-4 w-4 p-0"
+                  onClick={() => removeFile(index)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </form>
+    </div>
   )
 } 
