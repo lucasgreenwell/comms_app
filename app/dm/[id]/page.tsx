@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { useRouter, useSearchParams } from 'next/navigation'
 import UserDisplay from '../../components/UserDisplay'
 import VoiceRecorder from '../../components/VoiceRecorder'
+import MessageInput from '../../components/MessageInput'
 import type { Message } from '../../types/entities/Message'
 import type { Translation } from '../../types/entities/Translation'
 import type { FileAttachment } from '../../types/entities/FileAttachment'
@@ -679,69 +680,13 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             ))}
           </div>
         </div>
-        <form onSubmit={sendMessage} className="p-4 space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              className="flex-1 p-2 border rounded"
-              placeholder="Type your message..."
-            />
-            <Button 
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setShowVoiceRecorder(true)}
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <Button type="submit">
-              Send
-            </Button>
-          </div>
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple
+        <div className="p-4">
+          <MessageInput
+            messageType="dm"
+            parentId={params.id}
+            placeholder="Type your message..."
           />
-          {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                  <span className="text-sm">{file.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => removeFile(index)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-          {showVoiceRecorder && (
-            <div className="mt-2">
-              <VoiceRecorder
-                onRecordingComplete={handleVoiceRecordingComplete}
-                onCancel={() => setShowVoiceRecorder(false)}
-              />
-            </div>
-          )}
-        </form>
+        </div>
       </div>
       {activeThread && (
         <ConversationThreadComments 

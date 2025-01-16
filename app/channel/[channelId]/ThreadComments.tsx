@@ -11,6 +11,7 @@ import { themes } from '../../config/themes'
 import { usePresence } from '../../hooks/usePresence'
 import MessageDisplay from '../../components/MessageDisplay'
 import VoiceRecorder from '../../components/VoiceRecorder'
+import MessageInput from '../../components/MessageInput'
 import type { ThreadComment } from '@/app/types/entities/ThreadComment'
 import type { ThreadCommentsProps } from '@/app/types/props/ThreadCommentsProps'
 
@@ -476,66 +477,13 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t space-y-2">
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Reply to thread..."
-            className="flex-1"
-          />
-          <Button 
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setShowVoiceRecorder(true)}
-            className="w-10 h-10"
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-          <Button 
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Button type="submit">Reply</Button>
-        </div>
-        {showVoiceRecorder && (
-          <VoiceRecorder
-            onRecordingComplete={handleVoiceRecordingComplete}
-            onCancel={() => setShowVoiceRecorder(false)}
-          />
-        )}
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileSelect}
-          className="hidden"
-          multiple
+      <div className="p-4 border-t">
+        <MessageInput
+          messageType="channel_thread"
+          parentId={postId}
+          placeholder="Reply to thread..."
         />
-        {selectedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {selectedFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-4 w-4 p-0"
-                  onClick={() => removeFile(index)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </form>
+      </div>
     </div>
   )
 } 

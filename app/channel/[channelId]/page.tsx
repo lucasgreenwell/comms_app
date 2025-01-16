@@ -14,6 +14,8 @@ import type { Channel } from '@/app/types/entities/Channel'
 import type { Post } from '@/app/types/entities/Post'
 import VoiceRecorder from '../../components/VoiceRecorder'
 import VoiceMessage from '../../components/VoiceMessage'
+import MessageInput from '../../components/MessageInput'
+import type { FileAttachment } from '@/app/types/entities/FileAttachment'
 
 type DbPost = {
   id: string;
@@ -23,15 +25,7 @@ type DbPost = {
   created_at: string;
   files: {
     id: string;
-    file: {
-      id: string;
-      file_name: string;
-      file_type: string;
-      file_size: number;
-      path: string;
-      bucket: string;
-      duration_seconds: number;
-    };
+    file: FileAttachment;
   }[] | null;
   translations: {
     id: string;
@@ -223,13 +217,7 @@ export default function Channel() {
         ...post,
         user: users?.find(user => user.id === post.user_id) || { id: post.user_id, email: 'Unknown User', display_name: null },
         files: post.files?.map(f => ({
-          id: f.file.id,
-          file_name: f.file.file_name,
-          file_type: f.file.file_type,
-          file_size: f.file.file_size,
-          path: f.file.path,
-          bucket: f.file.bucket,
-          duration_seconds: f.file.duration_seconds
+          ...f.file
         })) || [],
         translation: post.translations?.[0] || null
       }))
@@ -368,13 +356,7 @@ export default function Channel() {
               native_language: user.native_language
             },
             files: post.files?.map(f => ({
-              id: f.file.id,
-              file_name: f.file.file_name,
-              file_type: f.file.file_type,
-              file_size: f.file.file_size,
-              path: f.file.path,
-              bucket: f.file.bucket,
-              duration_seconds: f.file.duration_seconds
+              ...f.file
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -456,13 +438,7 @@ export default function Channel() {
               native_language: user.native_language
             },
             files: post.files?.map(f => ({
-              id: f.file.id,
-              file_name: f.file.file_name,
-              file_type: f.file.file_type,
-              file_size: f.file.file_size,
-              path: f.file.path,
-              bucket: f.file.bucket,
-              duration_seconds: f.file.duration_seconds
+              ...f.file
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -602,13 +578,7 @@ export default function Channel() {
               native_language: user.native_language
             },
             files: post.files?.map(f => ({
-              id: f.file.id,
-              file_name: f.file.file_name,
-              file_type: f.file.file_type,
-              file_size: f.file.file_size,
-              path: f.file.path,
-              bucket: f.file.bucket,
-              duration_seconds: f.file.duration_seconds
+              ...f.file
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -740,13 +710,7 @@ export default function Channel() {
             ...post,
             user: users.find(user => user.id === post.user_id)!,
             files: post.files?.map(f => ({
-              id: f.file.id,
-              file_name: f.file.file_name,
-              file_type: f.file.file_type,
-              file_size: f.file.file_size,
-              path: f.file.path,
-              bucket: f.file.bucket,
-              duration_seconds: f.file.duration_seconds
+              ...f.file
             })) || [],
             translation: post.translations?.[0] || null
           }))
@@ -1075,78 +1039,13 @@ export default function Channel() {
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <form onSubmit={handleSendMessage} className="space-y-2 p-4">
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message..."
-              className={`flex-1 ${
-                tourStep === 2 ? 'ring-4 ring-offset-2 ring-blue-500 ring-offset-background animate-slow-pulse' : ''
-              } transition-all duration-300`}
-            />
-            <Button 
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => setShowVoiceRecorder(true)}
-              className="w-10 h-10"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              className={`${
-                tourStep === 2 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
-              } transition-all duration-300`}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button 
-              type="submit"
-              className={`${
-                tourStep === 2 ? 'scale-110 animate-slow-pulse ring-4 ring-offset-2 ring-blue-500 ring-offset-background' : ''
-              } transition-all duration-300`}
-            >
-              Send
-            </Button>
-          </div>
-          {showVoiceRecorder && (
-            <VoiceRecorder
-              onRecordingComplete={handleVoiceRecordingComplete}
-              onCancel={() => setShowVoiceRecorder(false)}
-            />
-          )}
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            className="hidden"
-            multiple
+        <div className="p-4">
+          <MessageInput
+            messageType="channel"
+            parentId={channelId as string}
+            placeholder="Type your message..."
           />
-          {selectedFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedFiles.map((file, index) => (
-                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                  <span className="text-sm truncate max-w-[200px]">{file.name}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0"
-                    onClick={() => removeFile(index)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </form>
+        </div>
       </div>
       {activeThread && (
         <ThreadComments 

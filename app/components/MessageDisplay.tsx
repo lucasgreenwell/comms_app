@@ -113,7 +113,7 @@ export default function MessageDisplay({
     } else if (messageType === 'dm') {
       query = query.eq('message_id', id);
     } else if (messageType === 'dm_thread') {
-      query = query.eq('conversation_thread_id', id);
+      query = query.eq('conversation_thread_comment_id', id);
     }
 
     const { data, error } = await query;
@@ -144,7 +144,7 @@ export default function MessageDisplay({
     } else if (messageType === 'dm') {
       reactionData.message_id = id;
     } else if (messageType === 'dm_thread') {
-      reactionData.conversation_thread_id = id;
+      reactionData.conversation_thread_comment_id = id;
     }
 
     const { data, error } = await supabase
@@ -378,7 +378,7 @@ export default function MessageDisplay({
     } else if (messageType === 'dm') {
       filterCondition = `message_id=eq.${id}`;
     } else if (messageType === 'dm_thread') {
-      filterCondition = `conversation_thread_id=eq.${id}`;
+      filterCondition = `conversation_thread_comment_id=eq.${id}`;
     }
 
     const channel = supabase
