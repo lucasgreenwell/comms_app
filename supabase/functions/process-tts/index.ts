@@ -14,6 +14,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+type ContentType = 'post' | 'message' | 'post_thread_comment' | 'conversation_thread_comment';
+
+interface ContentItem {
+  id: string;
+  content: string;
+  type: ContentType;
+}
+
+async function fetchContentWithoutTTS(supabaseClient: any): Promise<ContentItem[]> {
+  const results: ContentItem[] = [];
+
+  // Fetch posts
+  const { data: posts, error: postsError } = await supabaseClient.rpc('posts_without_tts');
+  if (postsError) throw postsError;
+  results.push(...posts.map(p => ({ ...p, type: 'post' as ContentType })));
+
+  // Fetch messages
+  const { data: messages, error: messagesError } = await supabaseClient.rpc('messages_without_tts');
+  if (messagesError) throw messagesError;
+  results.push(...messages.map(m => ({ ...m, type: 'message' as ContentType })));
+
+  // Fetch post thread comments
+  const { data: postComments, error: postCommentsError } = await supabaseClient.rpc('post_thread_comments_without_tts');
+  if (postCommentsError) throw postCommentsError;
+  results.push(...postComments.map(pc => ({ ...pc, type: 'post_thread_comment' as ContentType })));
+
+  // Fetch conversation thread comments
+  const { data: convComments, error: convCommentsError } = await supabaseClient.rpc('conversation_thread_comments_without_tts');
+  if (convCommentsError) throw convCommentsError;
+  results.push(...convComments.map(cc => ({ ...cc, type: 'conversation_thread_comment' as ContentType })));
+
+  return results;
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -29,18 +63,11 @@ serve(async (req: Request) => {
       apiKey: Deno.env.get('OPENAI_API_KEY'),
     })
 
-    // Fetch posts that need TTS processing using our SQL function
-    const { data: posts, error: postsError } = await supabaseClient
-      .rpc('posts_without_tts')
+    const items = await fetchContentWithoutTTS(supabaseClient);
 
-    if (postsError) {
-      throw postsError
-    }
-
-    // If no posts need processing, return early
-    if (!posts || posts.length === 0) {
+    if (!items || items.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, results: [], message: "No new posts to process" }),
+        JSON.stringify({ success: true, results: [], message: "No new content to process" }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -50,16 +77,34 @@ serve(async (req: Request) => {
 
     const results = []
 
-    for (const post of posts) {
+    for (const item of items) {
       try {
+        // Create data object for TTS recording entry
+        const data: Record<string, any> = {
+          status: 'processing',
+          storage_path: `${item.type}_${item.id}.mp3`
+        };
+
+        // Set the appropriate foreign key based on content type
+        switch (item.type) {
+          case 'post':
+            data.post_id = item.id;
+            break;
+          case 'message':
+            data.message_id = item.id;
+            break;
+          case 'post_thread_comment':
+            data.post_thread_comment_id = item.id;
+            break;
+          case 'conversation_thread_comment':
+            data.conversation_thread_comment_id = item.id;
+            break;
+        }
+
         // Create a TTS recording entry
         const { data: ttsRecord, error: ttsError } = await supabaseClient
           .from('tts_recordings')
-          .insert({
-            post_id: post.id,
-            status: 'processing',
-            storage_path: `${post.id}.mp3`
-          })
+          .insert(data)
           .select()
           .single()
 
@@ -69,7 +114,7 @@ serve(async (req: Request) => {
         const response = await openai.audio.speech.create({
           model: "tts-1",
           voice: "alloy",
-          input: post.content,
+          input: item.content,
         })
 
         // Convert the response to a Buffer
@@ -79,7 +124,7 @@ serve(async (req: Request) => {
         const { error: uploadError } = await supabaseClient
           .storage
           .from('tts_recordings')
-          .upload(`${post.id}.mp3`, audioBuffer, {
+          .upload(`${item.type}_${item.id}.mp3`, audioBuffer, {
             contentType: 'audio/mp3',
             upsert: true
           })
@@ -94,18 +139,35 @@ serve(async (req: Request) => {
 
         if (updateError) throw updateError
 
-        results.push({ post_id: post.id, status: 'success' })
+        results.push({ content_type: item.type, content_id: item.id, status: 'success' })
       } catch (error) {
         // Update status to failed
+        const updateData: Record<string, any> = {
+          status: 'failed',
+          error_message: error.message
+        };
+
+        switch (item.type) {
+          case 'post':
+            updateData.post_id = item.id;
+            break;
+          case 'message':
+            updateData.message_id = item.id;
+            break;
+          case 'post_thread_comment':
+            updateData.post_thread_comment_id = item.id;
+            break;
+          case 'conversation_thread_comment':
+            updateData.conversation_thread_comment_id = item.id;
+            break;
+        }
+
         await supabaseClient
           .from('tts_recordings')
-          .update({
-            status: 'failed',
-            error_message: error.message
-          })
-          .eq('post_id', post.id)
+          .update(updateData)
+          .eq(item.type + '_id', item.id)
 
-        results.push({ post_id: post.id, status: 'failed', error: error.message })
+        results.push({ content_type: item.type, content_id: item.id, status: 'failed', error: error.message })
       }
     }
 

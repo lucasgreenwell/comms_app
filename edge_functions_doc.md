@@ -9,18 +9,18 @@ This document outlines all the edge functions deployed on our Supabase project.
 **Authentication**: Requires service role key
 
 ### Description
-Processes text content from posts (and in the future, messages and comments) to create text-to-speech recordings using OpenAI's TTS API. The function:
-1. Fetches posts that don't have TTS recordings yet (or have failed recordings)
+Processes text content from posts, messages, thread comments, and conversation thread comments to create text-to-speech recordings using OpenAI's TTS API. The function:
+1. Fetches content that doesn't have TTS recordings yet (or has failed recordings)
 2. Creates a TTS recording entry in the database
 3. Calls OpenAI's TTS API to generate audio
 4. Stores the audio file in Supabase Storage
 5. Updates the recording status
 
 ### Processing Rules
-- Only processes posts that don't have an existing successful TTS recording
-- Will attempt to reprocess posts with failed recordings
-- Processes up to 5 posts per invocation to manage API rate limits
-- Returns early with a success message if no posts need processing
+- Only processes content that doesn't have an existing successful TTS recording
+- Will attempt to reprocess content with failed recordings
+- Processes up to 5 items per content type per invocation to manage API rate limits
+- Returns early with a success message if no content needs processing
 
 ### Required Environment Variables
 - `OPENAI_API_KEY`: Your OpenAI API key
@@ -33,6 +33,9 @@ Uses the `tts_recordings` bucket in Supabase Storage to store the generated audi
 ### Database Tables
 Interacts with:
 - `posts`: Reads post content
+- `messages`: Reads message content
+- `post_thread_comments`: Reads thread comment content
+- `conversation_thread_comments`: Reads conversation thread comment content
 - `tts_recordings`: Creates and updates TTS recording entries
 
 ### Example Usage
@@ -47,7 +50,8 @@ curl -i --location --request POST 'https://[PROJECT_REF].functions.supabase.co/p
 {
   success: boolean;
   results: Array<{
-    post_id: string;
+    content_type: 'post' | 'message' | 'post_thread_comment' | 'conversation_thread_comment';
+    content_id: string;
     status: 'success' | 'failed';
     error?: string;
   }>;
@@ -55,10 +59,9 @@ curl -i --location --request POST 'https://[PROJECT_REF].functions.supabase.co/p
 ```
 
 ### Future Enhancements
-- Support for processing messages from DMs
-- Support for processing thread comments
 - Support for different voices and languages
-- Batch processing improvements 
+- Batch processing improvements
+- Voice customization per user
 
 ## Process Embeddings
 
@@ -83,7 +86,7 @@ Interacts with:
 - `posts`: Reads post content
 - `messages`: Reads message content
 - `post_thread_comments`: Reads thread comment content
-- `conversation_thread_comments`: Reads DM thread comment content
+- `conversation_thread_comments`: Reads conversation thread comment content
 - `vector_embeddings`: Stores the generated embeddings
 
 ### Example Usage
@@ -118,7 +121,7 @@ curl -i --location --request POST 'https://[PROJECT_REF].functions.supabase.co/p
 - Embeddings are normalized for consistent similarity comparisons
 
 ### Future Enhancements
-- Support for more content types
 - Real-time embedding generation
 - Batch size optimization
-- Advanced similarity search features 
+- Advanced similarity search features
+- Custom embedding models for specific content types 
