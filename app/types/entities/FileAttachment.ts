@@ -4,4 +4,6 @@ export interface FileAttachment {
   file_type: string
   file_size: number
   path: string
+  bucket: string
+  duration_seconds?: number
 } 

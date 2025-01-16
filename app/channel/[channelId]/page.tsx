@@ -314,7 +314,8 @@ export default function Channel() {
                   file_type,
                   file_size,
                   path,
-                  bucket
+                  bucket,
+                  duration_seconds
                 )
               ),
               translations (
@@ -366,12 +367,14 @@ export default function Channel() {
               display_name: user.display_name,
               native_language: user.native_language
             },
-            files: post.files?.map((f: { file: { id: string; file_name: string; file_type: string; file_size: number; path: string; }; }) => ({
+            files: post.files?.map(f => ({
               id: f.file.id,
               file_name: f.file.file_name,
               file_type: f.file.file_type,
               file_size: f.file.file_size,
-              path: f.file.path
+              path: f.file.path,
+              bucket: f.file.bucket,
+              duration_seconds: f.file.duration_seconds
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -394,7 +397,9 @@ export default function Channel() {
                   file_name,
                   file_type,
                   file_size,
-                  path
+                  path,
+                  bucket,
+                  duration_seconds
                 )
               ),
               translations (
@@ -450,12 +455,14 @@ export default function Channel() {
               display_name: user.display_name,
               native_language: user.native_language
             },
-            files: post.files?.map((f: { file: { id: string; file_name: string; file_type: string; file_size: number; path: string; }; }) => ({
+            files: post.files?.map(f => ({
               id: f.file.id,
               file_name: f.file.file_name,
               file_type: f.file.file_type,
               file_size: f.file.file_size,
-              path: f.file.path
+              path: f.file.path,
+              bucket: f.file.bucket,
+              duration_seconds: f.file.duration_seconds
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -540,7 +547,9 @@ export default function Channel() {
                   file_name,
                   file_type,
                   file_size,
-                  path
+                  path,
+                  bucket,
+                  duration_seconds
                 )
               ),
               translations (
@@ -597,7 +606,9 @@ export default function Channel() {
               file_name: f.file.file_name,
               file_type: f.file.file_type,
               file_size: f.file.file_size,
-              path: f.file.path
+              path: f.file.path,
+              bucket: f.file.bucket,
+              duration_seconds: f.file.duration_seconds
             })) || [],
             translation: post.translations?.[0] || null
           }
@@ -680,7 +691,9 @@ export default function Channel() {
                   file_name,
                   file_type,
                   file_size,
-                  path
+                  path,
+                  bucket,
+                  duration_seconds
                 )
               ),
               translations (
@@ -731,7 +744,9 @@ export default function Channel() {
               file_name: f.file.file_name,
               file_type: f.file.file_type,
               file_size: f.file.file_size,
-              path: f.file.path
+              path: f.file.path,
+              bucket: f.file.bucket,
+              duration_seconds: f.file.duration_seconds
             })) || [],
             translation: post.translations?.[0] || null
           }))

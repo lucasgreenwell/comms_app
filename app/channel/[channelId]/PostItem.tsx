@@ -124,12 +124,13 @@ export default function PostItem({ post, onPostUpdate, onThreadOpen }: PostItemP
       <div className="flex flex-wrap gap-2 mt-2">
         {post.files.map((file: FileAttachment) => {
           if (file.file_type === 'audio/mp3') {
-            const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/voice-messages/${file.path}`
             return (
               <VoiceMessage
                 key={file.id}
-                url={url}
+                bucket={file.bucket}
+                path={file.path}
                 fileName={file.file_name}
+                duration={file.duration_seconds || 0}
               />
             )
           }
