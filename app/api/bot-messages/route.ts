@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const relevantSources = similarContent?.length && aiResponse.relevant_sources.length
       ? '<br><span class="text-xs">Sources: ' + aiResponse.relevant_sources
           .map((index: number) => {
-            const item = similarContent[index]
+            const item = similarContent[index - 1]
             let href = ''
             if (item.channel_id) {
               href = `/channel/${item.channel_id}`
