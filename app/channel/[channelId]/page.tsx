@@ -1055,7 +1055,8 @@ export default function Channel() {
             content: activeThread.content,
             created_at: activeThread.created_at,
             user: activeThread.user,
-            translation: activeThread.translation
+            translation: activeThread.translation,
+            files: posts.find(post => post.id === activeThread.postId)?.files || []
           }}
           onClose={handleThreadClose} 
         />

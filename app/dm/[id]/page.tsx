@@ -553,7 +553,8 @@ export default function DirectMessagePage({ params }: { params: { id: string } }
             id: activeThread.messageId,
             content: activeThread.content,
             created_at: activeThread.created_at,
-            sender: activeThread.sender
+            sender: activeThread.sender,
+            files: messages.find(message => message.id === activeThread.messageId)?.files || []
           }}
           onClose={handleThreadClose}
         />

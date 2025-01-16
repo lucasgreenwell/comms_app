@@ -28,5 +28,14 @@ export interface ThreadCommentsProps {
       japanese_translation: string | null
       western_punjabi_translation: string | null
     } | null
+    files?: {
+      id: string
+      file_name: string
+      file_type: string
+      file_size: number
+      path: string
+      bucket: string
+      duration_seconds?: number
+    }[]
   }
 } 

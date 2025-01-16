@@ -45,6 +45,7 @@ interface ConversationThreadCommentsProps {
       email: string
       display_name?: string | null
     }
+    files?: FileAttachment[]
   }
 }
 
@@ -532,6 +533,7 @@ export default function ConversationThreadComments({ messageId, conversationId, 
           onUpdate={() => {}}
           tableName="messages"
           created_at={originalMessage.created_at}
+          files={originalMessage.files}
         />
       </div>
       

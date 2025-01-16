@@ -479,6 +479,7 @@ export default function ThreadComments({ postId, onClose, originalPost }: Thread
           tableName="posts"
           translation={originalPost.translation}
           created_at={originalPost.created_at}
+          files={originalPost.files}
         />
       </div>
       
