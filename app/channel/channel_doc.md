@@ -900,3 +900,126 @@ type DbPost = {
 ```
 
 This type ensures proper handling of database responses and transformations. 
+
+# Channel Feature Documentation
+
+## Voice Messages
+
+### Overview
+The voice message feature allows users to record and send audio messages within channels. The system handles recording, storage, playback, and proper duration tracking.
+
+### Components
+
+#### 1. VoiceRecorder Component
+- **Purpose**: Handles the recording of voice messages
+- **Key Features**:
+  - Microphone access management
+  - Real-time recording state management
+  - Preview playback before sending
+  - Duration tracking during recording
+  - Cancellation and cleanup
+
+#### 2. VoiceMessage Component
+- **Purpose**: Displays and plays voice messages
+- **Key Features**:
+  - Secure audio playback using signed URLs
+  - Progress bar with accurate duration display
+  - Play/pause controls
+  - Time formatting
+  - Automatic cleanup of audio resources
+
+### Technical Implementation
+
+#### Recording Process
+1. User initiates recording
+2. System:
+   - Requests microphone permissions
+   - Starts MediaRecorder
+   - Tracks recording duration
+   - Collects audio chunks
+3. On stop:
+   - Combines audio chunks into MP3 blob
+   - Provides preview
+   - Stores actual recording duration
+
+#### Storage
+- Voice messages are stored in the 'voice-messages' bucket
+- File records include:
+  - Duration in seconds
+  - File metadata (name, type, size)
+  - Path and bucket information
+  - User attribution
+
+#### Playback
+1. Component fetches signed URL for secure access
+2. Audio player displays:
+   - Accurate duration from database
+   - Current playback position
+   - Progress bar
+   - Play/pause controls
+
+### Database Schema
+
+#### Files Table
+```sql
+CREATE TABLE files (
+    id UUID PRIMARY KEY,
+    file_name TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    path TEXT NOT NULL,
+    bucket TEXT NOT NULL,
+    duration_seconds FLOAT,
+    uploaded_by UUID REFERENCES users(id)
+);
+```
+
+### Security
+
+#### Storage Policies
+```sql
+-- Allow authenticated users to read voice messages
+CREATE POLICY "Authenticated users can read voice messages"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'voice-messages'
+  AND auth.role() = 'authenticated'
+);
+
+-- Allow authenticated users to upload voice messages
+CREATE POLICY "Authenticated users can upload voice messages"
+ON storage.objects FOR INSERT
+WITH CHECK (
+  bucket_id = 'voice-messages' 
+  AND auth.role() = 'authenticated'
+);
+
+-- Allow users to delete their own voice messages
+CREATE POLICY "Users can delete their own voice messages"
+ON storage.objects FOR DELETE
+USING (
+  bucket_id = 'voice-messages'
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+```
+
+### Error Handling
+- Microphone permission denials
+- Recording failures
+- Upload errors
+- Playback issues
+- Network connectivity problems
+
+### Best Practices
+1. Always clean up audio resources when component unmounts
+2. Use signed URLs for secure access
+3. Store actual recording duration instead of relying on metadata
+4. Handle all potential error states gracefully
+5. Provide clear feedback to users during recording/playback
+
+### Future Improvements
+1. Waveform visualization
+2. Recording quality options
+3. Background noise reduction
+4. Transcription support
+5. Message retention policies 

@@ -29,6 +29,8 @@ type DbPost = {
       file_type: string;
       file_size: number;
       path: string;
+      bucket: string;
+      duration_seconds: number;
     };
   }[] | null;
   translations: {
@@ -144,6 +146,8 @@ export default function Channel() {
             file_type: string;
             file_size: number;
             path: string;
+            bucket: string;
+            duration_seconds: number;
           };
         }[] | null;
         translations: {
@@ -181,7 +185,9 @@ export default function Channel() {
               file_name,
               file_type,
               file_size,
-              path
+              path,
+              bucket,
+              duration_seconds
             )
           ),
           translations (
@@ -221,7 +227,9 @@ export default function Channel() {
           file_name: f.file.file_name,
           file_type: f.file.file_type,
           file_size: f.file.file_size,
-          path: f.file.path
+          path: f.file.path,
+          bucket: f.file.bucket,
+          duration_seconds: f.file.duration_seconds
         })) || [],
         translation: post.translations?.[0] || null
       }))
@@ -267,6 +275,7 @@ export default function Channel() {
                 file_type: string;
                 file_size: number;
                 path: string;
+                bucket: string;
               };
             }[] | null;
             translations: {
@@ -304,7 +313,8 @@ export default function Channel() {
                   file_name,
                   file_type,
                   file_size,
-                  path
+                  path,
+                  bucket
                 )
               ),
               translations (
@@ -493,6 +503,7 @@ export default function Channel() {
                 file_type: string;
                 file_size: number;
                 path: string;
+                bucket: string;
               };
             }[] | null;
             translations: {
@@ -631,6 +642,7 @@ export default function Channel() {
                 file_type: string;
                 file_size: number;
                 path: string;
+                bucket: string;
               };
             }[] | null;
             translations: {
@@ -936,7 +948,7 @@ export default function Channel() {
     setActiveThread(null)
   }
 
-  const handleVoiceRecordingComplete = async (audioBlob: Blob) => {
+  const handleVoiceRecordingComplete = async (audioBlob: Blob, duration: number) => {
     try {
       const supabase = getSupabase()
       const { data: { user } } = await supabase.auth.getUser()
@@ -953,7 +965,7 @@ export default function Channel() {
 
       if (uploadError) throw uploadError
 
-      // Create file record
+      // Create file record with duration
       const { data: fileData, error: fileRecordError } = await supabase
         .from('files')
         .insert({
@@ -962,7 +974,8 @@ export default function Channel() {
           file_size: audioBlob.size,
           bucket: 'voice-messages',
           path: filePath,
-          uploaded_by: user.id
+          uploaded_by: user.id,
+          duration_seconds: duration
         })
         .select()
         .single()

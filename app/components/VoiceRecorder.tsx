@@ -6,7 +6,7 @@ import { Mic, Square, X } from 'lucide-react'
 import { useToast } from '@/components/ui/use-toast'
 
 interface VoiceRecorderProps {
-  onRecordingComplete: (blob: Blob) => void
+  onRecordingComplete: (blob: Blob, duration: number) => void
   onCancel: () => void
 }
 
@@ -17,6 +17,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel }: VoiceRe
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const { toast } = useToast()
+  const startTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup function to stop recording if component unmounts while recording
@@ -36,6 +37,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel }: VoiceRe
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
+      startTimeRef.current = Date.now()
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -71,8 +73,9 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel }: VoiceRe
   }
 
   const handleSend = () => {
-    if (audioBlob) {
-      onRecordingComplete(audioBlob)
+    if (audioBlob && startTimeRef.current) {
+      const duration = (Date.now() - startTimeRef.current) / 1000
+      onRecordingComplete(audioBlob, duration)
       // Clean up
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl)

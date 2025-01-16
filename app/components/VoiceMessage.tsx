@@ -3,49 +3,96 @@
 import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Play, Pause } from 'lucide-react'
+import { getSupabase } from '../auth'
 
 interface VoiceMessageProps {
-  url: string
   fileName: string
+  bucket: string
+  path: string
+  duration: number
 }
 
-export default function VoiceMessage({ url, fileName }: VoiceMessageProps) {
+export default function VoiceMessage({ bucket, path, duration: initialDuration }: VoiceMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false)
-  const [duration, setDuration] = useState(0)
+  const [duration, setDuration] = useState(initialDuration || 0)
   const [currentTime, setCurrentTime] = useState(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
 
   useEffect(() => {
-    const audio = new Audio(url)
+    const fetchSignedUrl = async () => {
+      try {
+        const supabase = getSupabase()
+        const { data, error } = await supabase
+          .storage
+          .from(bucket)
+          .createSignedUrl(path, 3600) // 1 hour expiry
+
+        if (error) throw error
+        if (data) {
+          setSignedUrl(data.signedUrl)
+        }
+      } catch (error) {
+        setIsLoading(false)
+      }
+    }
+
+    fetchSignedUrl()
+  }, [bucket, path])
+
+  useEffect(() => {
+    if (!signedUrl) return
+
+    const audio = new Audio()
     audioRef.current = audio
 
-    audio.addEventListener('loadedmetadata', () => {
-      setDuration(audio.duration)
-    })
+    const handleLoadedMetadata = () => {
+      setIsLoading(false)
+    }
 
-    audio.addEventListener('timeupdate', () => {
+    const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime)
-    })
+    }
 
-    audio.addEventListener('ended', () => {
+    const handleEnded = () => {
       setIsPlaying(false)
       setCurrentTime(0)
-    })
+    }
+
+    const handleError = (e: ErrorEvent) => {
+      setIsLoading(false)
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('error', handleError)
+
+    audio.src = signedUrl
 
     return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('error', handleError)
       audio.pause()
       audio.src = ''
     }
-  }, [url])
+  }, [signedUrl, duration])
 
-  const togglePlayPause = () => {
-    if (audioRef.current) {
+  const togglePlayPause = async () => {
+    if (!audioRef.current) return
+
+    try {
       if (isPlaying) {
-        audioRef.current.pause()
+        await audioRef.current.pause()
       } else {
-        audioRef.current.play()
+        await audioRef.current.play()
       }
       setIsPlaying(!isPlaying)
+    } catch (error) {
+      // Error handled by error event listener
     }
   }
 
@@ -64,6 +111,7 @@ export default function VoiceMessage({ url, fileName }: VoiceMessageProps) {
         variant="ghost"
         size="icon"
         className="w-8 h-8"
+        disabled={isLoading || !signedUrl}
       >
         {isPlaying ? (
           <Pause className="h-4 w-4" />

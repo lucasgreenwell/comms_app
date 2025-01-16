@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
 import { EMOJI_PAGES } from '../config/emojis';
 import UserDisplay from './UserDisplay';
+import VoiceMessage from './VoiceMessage';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Tooltip,
@@ -284,7 +285,7 @@ export default function MessageDisplay({
     try {
       const supabase = getSupabase();
       const { data, error } = await supabase.storage
-        .from('file-uploads')
+        .from(file.bucket)
         .download(file.path);
 
       if (error) throw error;
@@ -320,7 +321,7 @@ export default function MessageDisplay({
 
       // Delete the file from storage
       const { error: storageError } = await supabase.storage
-        .from('file-uploads')
+        .from(file.bucket)
         .remove([file.path]);
 
       if (storageError) throw storageError;
@@ -529,38 +530,54 @@ export default function MessageDisplay({
           </TooltipProvider>
           {files && files.length > 0 && (
             <div className="mt-2 space-y-2">
-              {files.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[400px] hover:bg-gray-50 transition-colors"
-                >
-                  <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{file.file_name}</div>
-                    <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-blue-500 h-8 w-8 p-0"
-                      onClick={() => handleDownload(file)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    {isOwner && (
+              {files.map((file) => {
+                // Handle voice messages differently
+                if (file.file_type === 'audio/mp3' && file.bucket === 'voice-messages') {
+                  return (
+                    <VoiceMessage
+                      key={file.id}
+                      bucket={file.bucket}
+                      path={file.path}
+                      fileName={file.file_name}
+                      duration={file.duration_seconds}
+                    />
+                  )
+                }
+
+                // Handle other files as before
+                return (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-2 bg-white p-2 rounded border group/file max-w-[400px] hover:bg-gray-50 transition-colors"
+                  >
+                    <FileIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{file.file_name}</div>
+                      <div className="text-xs text-gray-500">{formatFileSize(file.file_size)}</div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity h-8 w-8 p-0"
-                        onClick={() => handleFileDelete(file)}
+                        className="text-blue-500 h-8 w-8 p-0"
+                        onClick={() => handleDownload(file)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Download className="h-4 w-4" />
                       </Button>
-                    )}
+                      {isOwner && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 opacity-0 group-hover/file:opacity-100 transition-opacity h-8 w-8 p-0"
+                          onClick={() => handleFileDelete(file)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
           <div className="flex justify-between items-center mt-1">
