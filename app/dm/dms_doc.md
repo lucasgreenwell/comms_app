@@ -414,4 +414,66 @@ The application implements comprehensive error handling for:
 - Authentication errors
 - Real-time subscription failures
 
-Each error is caught and displayed to the user via toast notifications. 
+Each error is caught and displayed to the user via toast notifications.
+
+## Bot Conversations
+
+### Overview
+The application includes an AI assistant bot (ID: '54296b9b-091e-4a19-b5b9-b890c24c1912') that uses Retrieval-Augmented Generation (RAG) to provide context-aware responses. The bot can access and reference content from channels the user is a member of and conversations they're participating in.
+
+### RAG Implementation
+The bot uses a comprehensive vector search across multiple content types:
+- Channel posts
+- Post thread comments
+- Direct messages
+- DM thread comments
+
+All content is embedded using OpenAI's text-embedding-3-large model and stored in the vector_embeddings table.
+
+### Content Access Control
+The bot's RAG system respects user permissions:
+- Only searches posts/threads from channels the user is a member of
+- Only searches DMs/threads from conversations the user participates in
+- Uses the match_all_content database function to enforce these permissions
+
+### Message Flow
+1. User sends message to bot
+2. System generates embedding for user's message
+3. Vector similarity search finds relevant content
+4. Content is formatted with source information
+5. GPT-4 generates response using:
+   - Retrieved context
+   - User's message
+   - System prompt
+6. Response includes:
+   - Bot's answer
+   - Clickable source links to relevant content
+   - Similarity scores for transparency
+
+### Source Attribution
+Bot responses include clickable source links that:
+- Link directly to the referenced content
+- Support different content types (posts, threads, DMs)
+- Include thread context when applicable
+- Open in new tabs for easy reference
+
+### Database Function
+The match_all_content function handles RAG queries with:
+- Vector similarity search
+- Permission checks
+- Content type identification
+- Relevance scoring
+- Source metadata
+
+### Response Format
+Bot messages are structured as:
+1. Main response text
+2. Source references (if relevant content found)
+3. Clickable links to source content
+4. Similarity scores for transparency
+
+### Integration Points
+- MessageInput component checks for bot conversations
+- Sends messages to /api/bot-messages endpoint
+- Handles bot responses via real-time subscriptions
+- Displays bot messages with source links 

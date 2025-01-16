@@ -24,34 +24,38 @@ export async function POST(request: Request) {
       encoding_format: "float"
     })
 
-    console.log('Generated embedding length:', embedding.data[0].embedding.length)
-
-    // Perform vector similarity search with posts instead of messages
-    const { data: similarPosts, error: searchError } = await supabase.rpc('match_posts', {
+    // Perform vector similarity search across all content types
+    const { data: similarContent, error: searchError } = await supabase.rpc('match_all_content', {
       query_embedding: embedding.data[0].embedding,
-      match_threshold: 0.0,
-      match_count: 3
+      match_threshold: 1.0,
+      match_count: 5,
+      p_user_id: senderId
     })
 
     if (searchError) {
-      console.error('Search error details:', JSON.stringify(searchError))
+      throw new Error(`Search error: ${JSON.stringify(searchError)}`)
     }
     
-    // Format context from similar posts, or use empty context if none found
-    const context = similarPosts?.length 
-      ? similarPosts
-          .map((post: any) => `${post.display_name}: ${post.content} (similarity: ${post.similarity.toFixed(3)})`)
+    // Format context from similar content, or use empty context if none found
+    const context = similarContent?.length 
+      ? similarContent
+          .map((item: any, index: number) => {
+            let locationInfo = ''
+            if (item.channel_id) {
+              locationInfo = `in channel ${item.channel_id}`
+              if (item.content_type === 'post_thread') {
+                locationInfo += ` (thread reply to post ${item.parent_id})`
+              }
+            } else if (item.conversation_id) {
+              locationInfo = `in DM ${item.conversation_id}`
+              if (item.content_type === 'dm_thread') {
+                locationInfo += ` (thread reply to message ${item.parent_id})`
+              }
+            }
+            return `[${index + 1}] ${item.display_name} ${locationInfo}: ${item.content} (similarity: ${item.similarity.toFixed(3)})`
+          })
           .join('\n')
       : "No relevant context found."
-
-    // Create source links
-    const sources = similarPosts?.length
-      ? '\n\nSources:\n' + similarPosts
-          .map((post: any, index: number) => 
-            `<a href="/channel/${post.channel_id}?thread=${post.post_id}" target="_blank" rel="noopener noreferrer" class="text-blue-500">[${index + 1}]</a>`
-          )
-          .join('\n')
-      : ''
 
     // Get chat completion from OpenAI
     const completion = await openai.chat.completions.create({
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
         },
         {
           role: "user",
-          content: `Context from posts throughout the company's slack:\n${context}\n\nUser's message: ${content}`
+          content: `Context from messages and posts throughout the company's communication:\n${context}\n\nUser's message: ${content}`
         }
       ],
       response_format: { type: "json_object" }
@@ -76,19 +80,31 @@ export async function POST(request: Request) {
     }
     const aiResponse = JSON.parse(messageContent)
 
-    console.log('relevant sources', aiResponse.relevant_sources);
-
     // Filter sources to only include the ones marked as relevant
-    const relevantSources = similarPosts?.length && aiResponse.relevant_sources.length
+    const relevantSources = similarContent?.length && aiResponse.relevant_sources.length
       ? '<br><span class="text-xs">Sources: ' + aiResponse.relevant_sources
           .map((index: number) => {
-            const post = similarPosts[index]
-            return `<a href="/channel/${post.channel_id}?thread=${post.post_id}" target="_blank" rel="noopener noreferrer" class="text-blue-500" title="Opens in new tab">[${index + 1}]</a>`
+            const item = similarContent[index]
+            let href = ''
+            if (item.channel_id) {
+              href = `/channel/${item.channel_id}`
+              if (item.content_type === 'post_thread') {
+                href += `?thread=${item.parent_id}#${item.content_id}`
+              } else {
+                href += `?thread=${item.content_id}`
+              }
+            } else if (item.conversation_id) {
+              href = `/dm/${item.conversation_id}`
+              if (item.content_type === 'dm_thread') {
+                href += `?thread=${item.parent_id}#${item.content_id}`
+              }
+            }
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-blue-500" title="Opens in new tab">[${index + 1}]</a>`
           })
-          .join('') + '</span>'
+          .join(' ') + '</span>'
       : ''
 
-    // Combine bot's response with filtered s ources
+    // Combine bot's response with filtered sources
     const responseWithSources = aiResponse.response + relevantSources
 
     // Save bot's response as a new message

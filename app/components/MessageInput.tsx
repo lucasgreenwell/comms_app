@@ -18,6 +18,8 @@ interface MessageInputProps {
   placeholder?: string
   // Optional class name for styling
   className?: string
+  // Optional participants array for checking bot conversations
+  participants?: { id: string }[]
 }
 
 export default function MessageInput({ 
@@ -25,7 +27,8 @@ export default function MessageInput({
   parentId,
   secondaryId,
   placeholder = "Type your message...",
-  className = ""
+  className = "",
+  participants = []
 }: MessageInputProps) {
   const [newMessage, setNewMessage] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -149,6 +152,28 @@ export default function MessageInput({
       setSelectedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
+      }
+
+      // Check if this is a conversation with the bot user
+      const isBotConversation = participants.some(p => p.id === '54296b9b-091e-4a19-b5b9-b890c24c1912')
+      
+      if (isBotConversation && messageType === 'dm') {
+        // Send message to bot API
+        const botResponse = await fetch('/api/bot-messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: newMessage.trim(),
+            conversationId: parentId,
+            senderId: user.id
+          }),
+        })
+
+        if (!botResponse.ok) {
+          throw new Error('Failed to get bot response')
+        }
       }
 
       toast({
