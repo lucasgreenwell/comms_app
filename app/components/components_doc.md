@@ -6,13 +6,15 @@ The components directory contains reusable UI components used throughout the app
 ## Directory Structure
 ```
 app/components/
-├── MessageDisplay.tsx      # Message display component with emoji reactions and file attachments
+├── MessageDisplay.tsx      # Message display component with emoji reactions, file attachments, and TTS
 ├── Notification.tsx        # Toast notification component
 ├── SearchModal.tsx         # Global search modal component
 ├── Sidebar.tsx            # Main navigation sidebar component
 ├── StartChatModal.tsx     # Modal for starting new direct messages
 ├── TourPopup.tsx          # Tour guide popup component
-└── UserDisplay.tsx        # User avatar and status display component
+├── UserDisplay.tsx        # User avatar and status display component
+├── VoiceMessage.tsx       # Audio player for voice messages
+└── VoiceRecorder.tsx      # Voice recording component for sending audio messages
 ```
 
 ## Type Definitions
@@ -192,6 +194,107 @@ Modal component for initiating new direct message conversations.
 - Custom header text
 - Animation support for tour integration
 - Integration with tour guide functionality
+
+### 7. VoiceMessage Component (`VoiceMessage.tsx`)
+
+#### Purpose
+Provides an audio player interface for voice messages with playback controls and progress tracking.
+
+#### Key Features
+- Audio playback controls (play/pause)
+- Progress bar with current time and duration
+- Automatic URL signing for secure audio access
+- Error handling for audio loading and playback
+- Time formatting for duration display
+
+#### Usage Example
+```typescript
+<VoiceMessage
+  fileName="audio.mp3"
+  bucket="voice-messages"
+  path="user/123/audio.mp3"
+  duration={120} // duration in seconds
+/>
+```
+
+### 8. VoiceRecorder Component (`VoiceRecorder.tsx`)
+
+#### Purpose
+Enables users to record and send voice messages within the chat interface.
+
+#### Key Features
+- Microphone access and recording controls
+- Live preview of recorded audio
+- Duration tracking
+- Blob handling for audio data
+- Permission handling and error messaging
+- Cancel and send functionality
+
+#### Usage Example
+```typescript
+<VoiceRecorder
+  onRecordingComplete={(blob, duration) => {
+    // Handle the recorded audio blob and duration
+  }}
+  onCancel={() => {
+    // Handle recording cancellation
+  }}
+/>
+```
+
+### 9. Text-to-Speech Integration
+
+The application includes a comprehensive text-to-speech (TTS) system integrated into the MessageDisplay component. This system allows messages to be read aloud, improving accessibility and user experience.
+
+#### Key Features
+- Automatic TTS generation for messages
+- Playback controls in the message interface
+- Support for multiple content types (messages, posts, thread comments)
+- Caching of generated audio for improved performance
+- Error handling for TTS generation and playback
+
+#### Database Integration
+The TTS system uses the following table structure:
+```sql
+tts_recordings
+- id: UUID (Primary Key)
+- content_id: UUID (FK to messages/posts/comments)
+- content_type: TEXT (message, post, thread_comment)
+- audio_path: TEXT
+- status: TEXT (pending, completed, failed)
+- created_at: TIMESTAMPTZ
+- updated_at: TIMESTAMPTZ
+```
+
+#### Implementation Details
+1. **TTS Generation Process**
+   - When a message is sent, a background job is triggered to generate TTS
+   - The audio file is stored in Supabase storage
+   - The recording status is tracked in the database
+
+2. **Playback Integration**
+   - The TTSPlayer component checks for existing recordings
+   - Only displays if a recording is completed
+   - Provides play/pause functionality
+   - Handles loading and error states
+
+3. **Content Type Handling**
+```typescript
+type ContentType = 'message' | 'post' | 'conversation_thread_comment' | 'post_thread_comment';
+
+interface TTSPlayerProps {
+  contentType: ContentType;
+  contentId: string;
+}
+```
+
+#### Usage Example
+```typescript
+<TTSPlayer
+  contentType="message"
+  contentId="message-uuid"
+/>
+```
 
 ## Usage Examples
 

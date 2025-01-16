@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Edit2, Trash2, X, Check, Waves, Download, FileIcon, Smile, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Edit2, Trash2, X, Check, Waves, Download, FileIcon, Smile, ChevronLeft, ChevronRight, MoreVertical, Globe } from 'lucide-react';
 import { getSupabase } from '../auth';
 import { useToast } from "@/components/ui/use-toast";
 import { themes } from '../config/themes';
@@ -19,6 +19,7 @@ import type { MessageDisplayProps } from '@/app/types/props/MessageDisplayProps'
 import type { File } from '@/app/types/entities/File'
 import type { EmojiReaction } from '@/app/types/entities/EmojiReaction'
 import type { Translation } from '@/app/types/entities/Translation'
+import TTSPlayer from './TTSPlayer'
 
 export default function MessageDisplay({
   id,
@@ -493,24 +494,120 @@ export default function MessageDisplay({
   
   return (
     <div
-      className={`bg-white py-3 px-6 rounded group hover:scale-[1.01] transition-all duration-200 relative pb-4 ${theme.colors.accent} hover:bg-opacity-15`}
+      className={`bg-white py-3 px-6 rounded group hover:scale-[1.01] transition-all duration-200 relative pb-4 ${theme.colors.accent} hover:bg-opacity-15 ${className}`}
     >
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <UserDisplay 
-              user={user}
-              isOnline={onlineUsers.has(user.id)}
-              className="font-bold"
-            />
-            <span className="text-xs text-gray-500">
-              {formatTimestamp(created_at)}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <UserDisplay 
+                user={user}
+                isOnline={onlineUsers.has(user.id)}
+                className="font-bold"
+              />
+              <span className="text-xs text-gray-500">
+                {formatTimestamp(created_at)}
+              </span>
+              <TTSPlayer 
+                contentType={
+                  messageType === 'dm' ? 'message' :
+                  messageType === 'post' ? 'post' :
+                  messageType === 'dm_thread' ? 'conversation_thread_comment' :
+                  messageType === 'post_thread' ? 'post_thread_comment' :
+                  'message'
+                }
+                contentId={id}
+              />
+            </div>
+            <div className="flex gap-1">
+              {currentUser && !hideActions && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Smile className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2">
+                    {/* Emoji Grid */}
+                    <div className="grid grid-cols-10 gap-1 mb-2">
+                      {EMOJI_PAGES[currentPage].map((emoji) => (
+                        <Button
+                          key={emoji}
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-accent"
+                          onClick={() => handleAddReaction(emoji)}
+                        >
+                          {emoji}
+                        </Button>
+                      ))}
+                    </div>
+                    {/* Pagination Controls */}
+                    <div className="flex justify-between items-center border-t pt-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : EMOJI_PAGES.length - 1))}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <span className="text-xs text-gray-500">
+                        Page {currentPage + 1} of {EMOJI_PAGES.length}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage((prev) => (prev < EMOJI_PAGES.length - 1 ? prev + 1 : 0))}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+              {showThread && onThreadOpen && !hideActions && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={() => onThreadOpen({ id, content, user })}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
+                >
+                  <Waves className="h-4 w-4" />
+                  {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
+                </Button>
+              )}
+              {isOwner && !hideActions && (
+                <>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => setIsEditing(true)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={handleDelete}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div dangerouslySetInnerHTML={{ __html: content }}></div>
+                <div className="text-sm whitespace-pre-wrap break-words mt-1">{content}</div>
               </TooltipTrigger>
               {getTranslatedContent() && (
                 <TooltipContent
@@ -523,7 +620,10 @@ export default function MessageDisplay({
                     whiteSpace: 'pre-wrap',
                   }}
                 >
-                  <p className={`text-sm ${theme.colors.foreground}`}>{getTranslatedContent()}</p>
+                  <div className="flex items-center gap-1">
+                    <Globe className="h-3 w-3" />
+                    <p className={`text-sm ${theme.colors.foreground}`}>{getTranslatedContent()}</p>
+                  </div>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -539,7 +639,7 @@ export default function MessageDisplay({
                       bucket={file.bucket}
                       path={file.path}
                       fileName={file.file_name}
-                      duration={file.duration_seconds}
+                      duration={file.duration_seconds || 0}
                     />
                   )
                 }
@@ -580,139 +680,53 @@ export default function MessageDisplay({
               })}
             </div>
           )}
-          <div className="flex justify-between items-center mt-1">
-            {/* Emoji Reactions */}
-            <div className="flex flex-wrap gap-1 mt-1">
-              {Object.entries(groupedReactions).map(([emoji, reactions]) => {
-                const hasUserReacted = reactions.some(r => r.user_id === currentUser?.id);
-                // Get just the display names for each user who reacted
-                const reactingUsers = reactions
-                  .map(r => {
-                    if (r.user_id === currentUser?.id) {
-                      return currentUser.display_name || 'You';
-                    }
-                    const user = reactionUsers[r.user_id];
-                    return user?.display_name || user?.email?.split('@')[0] || 'Unknown user';
-                  })
-                  .join(', ');
-                
-                return (
-                  <TooltipProvider key={emoji}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={`h-8 px-3 py-1 text-sm rounded-full bg-opacity-25 ${
-                            hasUserReacted ? `${theme.colors.background} bg-opacity-25` : 'hover:bg-accent'
-                          }`}
-                          onClick={() => {
-                            const userReaction = reactions.find(r => r.user_id === currentUser?.id);
-                            if (userReaction) {
-                              handleRemoveReaction(userReaction.id);
-                            } else {
-                              handleAddReaction(emoji);
-                            }
-                          }}
-                        >
-                          <span className="mr-1.5 text-base">{emoji}</span>
-                          <span>{reactions.length}</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" align="center" sideOffset={5} className="p-2 z-[9999]">
-                        <p className="text-sm">{reactingUsers}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                );
-              })}
-            </div>
-          </div>
         </div>
-        <div className="flex flex-col items-end">
-          <div className="flex gap-1">
-            {currentUser && !hideActions && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-2">
-                  {/* Emoji Grid */}
-                  <div className="grid grid-cols-10 gap-1 mb-2">
-                    {EMOJI_PAGES[currentPage].map((emoji) => (
+        <div className="flex justify-between items-center mt-1">
+          {/* Emoji Reactions */}
+          <div className="flex flex-wrap gap-1 mt-1">
+            {Object.entries(groupedReactions).map(([emoji, reactions]) => {
+              const hasUserReacted = reactions.some(r => r.user_id === currentUser?.id);
+              // Get just the display names for each user who reacted
+              const reactingUsers = reactions
+                .map(r => {
+                  if (r.user_id === currentUser?.id) {
+                    return currentUser.display_name || 'You';
+                  }
+                  const user = reactionUsers[r.user_id];
+                  return user?.display_name || user?.email?.split('@')[0] || 'Unknown user';
+                })
+                .join(', ');
+              
+              return (
+                <TooltipProvider key={emoji}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
                       <Button
-                        key={emoji}
                         size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-accent"
-                        onClick={() => handleAddReaction(emoji)}
+                        variant="outline"
+                        className={`h-8 px-3 py-1 text-sm rounded-full bg-opacity-25 ${
+                          hasUserReacted ? `${theme.colors.background} bg-opacity-25` : 'hover:bg-accent'
+                        }`}
+                        onClick={() => {
+                          const userReaction = reactions.find(r => r.user_id === currentUser?.id);
+                          if (userReaction) {
+                            handleRemoveReaction(userReaction.id);
+                          } else {
+                            handleAddReaction(emoji);
+                          }
+                        }}
                       >
-                        {emoji}
+                        <span className="mr-1.5 text-base">{emoji}</span>
+                        <span>{reactions.length}</span>
                       </Button>
-                    ))}
-                  </div>
-                  {/* Pagination Controls */}
-                  <div className="flex justify-between items-center border-t pt-2">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setCurrentPage((prev) => (prev > 0 ? prev - 1 : EMOJI_PAGES.length - 1))}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="text-xs text-gray-500">
-                      Page {currentPage + 1} of {EMOJI_PAGES.length}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setCurrentPage((prev) => (prev < EMOJI_PAGES.length - 1 ? prev + 1 : 0))}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-            {showThread && onThreadOpen && !hideActions && (
-              <Button 
-                size="sm" 
-                variant="ghost" 
-                onClick={() => onThreadOpen({ id, content, user })}
-                className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1"
-              >
-                <Waves className="h-4 w-4" />
-                {threadCount > 0 && <span className="text-xs">{threadCount}</span>}
-              </Button>
-            )}
-            {isOwner && !hideActions && (
-              <>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={() => setIsEditing(true)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Edit2 className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={handleDelete}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+                    </TooltipTrigger>
+                    <TooltipContent side="right" align="center" sideOffset={5} className="p-2 z-[9999]">
+                      <p className="text-sm">{reactingUsers}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              );
+            })}
           </div>
         </div>
       </div>
