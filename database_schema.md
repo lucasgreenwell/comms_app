@@ -130,3 +130,58 @@ CREATE POLICY update_policy ON vector_embeddings
 CREATE POLICY delete_policy ON vector_embeddings
     FOR DELETE
     USING (auth.role() = 'authenticated');
+
+```
+
+---
+
+### 9. **tts_recordings**
+| Column                             | Type         | Description                                                             |
+|------------------------------------|--------------|-------------------------------------------------------------------------|
+| **id**                             | UUID         | Primary key                                                             |
+| **post_id**                        | UUID         | FK to `posts.id`, nullable                                              |
+| **message_id**                     | UUID         | FK to `messages.id`, nullable                                           |
+| **post_thread_comment_id**         | UUID         | FK to `post_thread_comments.id`, nullable                               |
+| **conversation_thread_comment_id** | UUID         | FK to `conversation_thread_comments.id`, nullable                       |
+| **storage_path**                   | TEXT         | Path to the audio file in Supabase storage                              |
+| **created_at**                     | TIMESTAMPTZ  | Default to `NOW()`, record creation time                                |
+| **updated_at**                     | TIMESTAMPTZ  | Default to `NOW()`, last update time                                    |
+| **status**                         | TEXT         | Status of TTS processing ('pending', 'processing', 'completed', 'failed')|
+| **error_message**                  | TEXT         | Error message if processing failed, nullable                            |
+
+**Notes**:  
+- Only one of the foreign key columns (`post_id`, `message_id`, `post_thread_comment_id`, `conversation_thread_comment_id`) can be set at a time.
+- Includes a storage bucket `tts_recordings` for storing the audio files.
+- Status field tracks the processing state of each TTS request.
+
+**RLS Policies**:  
+```sql
+ALTER TABLE tts_recordings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow authenticated users to read tts_recordings"
+ON tts_recordings FOR SELECT
+TO authenticated
+USING (true);
+
+CREATE POLICY "Allow authenticated users to insert tts_recordings"
+ON tts_recordings FOR INSERT
+TO authenticated
+WITH CHECK (true);
+
+CREATE POLICY "Allow authenticated users to update their own tts_recordings"
+ON tts_recordings FOR UPDATE
+TO authenticated
+USING (true);
+```
+
+**Storage Policies**:
+```sql
+CREATE POLICY "Allow authenticated users to read tts recordings"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'tts_recordings');
+
+CREATE POLICY "Allow authenticated users to insert tts recordings"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'tts_recordings');
