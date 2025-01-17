@@ -9,21 +9,24 @@ This document outlines all the edge functions deployed on our Supabase project.
 **Authentication**: Requires service role key
 
 ### Description
-Processes text content from posts, messages, thread comments, and conversation thread comments to create text-to-speech recordings using OpenAI's TTS API. The function:
-1. Fetches content that doesn't have TTS recordings yet (or has failed recordings)
-2. Creates a TTS recording entry in the database
-3. Calls OpenAI's TTS API to generate audio
-4. Stores the audio file in Supabase Storage
-5. Updates the recording status
+Processes text content from posts, messages, thread comments, and conversation thread comments to create text-to-speech recordings using either ElevenLabs (for users with voice clones) or OpenAI's TTS API (as fallback). The function:
+1. Fetches content that doesn't have TTS recordings yet
+2. Checks if the content author has an ElevenLabs voice clone
+3. Creates a TTS recording entry in the database
+4. Generates audio using either ElevenLabs (if user has a voice clone) or OpenAI's TTS API
+5. Stores the audio file in Supabase Storage
+6. Updates the recording status
 
 ### Processing Rules
-- Only processes content that doesn't have an existing successful TTS recording
-- Will attempt to reprocess content with failed recordings
-- Processes up to 5 items per content type per invocation to manage API rate limits
-- Returns early with a success message if no content needs processing
+- Only processes content that doesn't have an existing TTS recording
+- Automatically deletes failed recordings before reprocessing
+- Skips empty content or whitespace-only content
+- Handles duplicate processing attempts gracefully
+- Uses personalized voice clones when available
 
 ### Required Environment Variables
 - `OPENAI_API_KEY`: Your OpenAI API key
+- `ELEVENLABS_API_KEY`: Your ElevenLabs API key
 - `SUPABASE_URL`: Your Supabase project URL (automatically set)
 - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase service role key (automatically set)
 
@@ -37,6 +40,7 @@ Interacts with:
 - `post_thread_comments`: Reads thread comment content
 - `conversation_thread_comments`: Reads conversation thread comment content
 - `tts_recordings`: Creates and updates TTS recording entries
+- `users`: Checks for ElevenLabs voice clone IDs
 
 ### Example Usage
 ```bash
@@ -52,16 +56,36 @@ curl -i --location --request POST 'https://[PROJECT_REF].functions.supabase.co/p
   results: Array<{
     content_type: 'post' | 'message' | 'post_thread_comment' | 'conversation_thread_comment';
     content_id: string;
-    status: 'success' | 'failed';
+    status: 'success' | 'failed' | 'skipped';
     error?: string;
+    message?: string;
   }>;
 }
 ```
 
+### Voice Generation Details
+#### ElevenLabs Configuration
+- Uses `eleven_multilingual_v2` model
+- Voice settings:
+  - Stability: 0.5
+  - Similarity Boost: 0.75
+
+#### OpenAI Configuration (Fallback)
+- Uses `tts-1` model
+- Default voice: "alloy"
+
+### Error Handling
+- Gracefully handles duplicate processing attempts
+- Provides detailed error messages from both APIs
+- Marks recordings as failed with error messages for debugging
+- Automatically cleans up failed recordings for retry
+
 ### Future Enhancements
-- Support for different voices and languages
+- Support for different fallback voices
 - Batch processing improvements
-- Voice customization per user
+- Voice customization parameters
+- Real-time processing option
+- Support for additional TTS providers
 
 ## Process Embeddings
 
