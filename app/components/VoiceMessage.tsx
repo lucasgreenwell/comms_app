@@ -6,13 +6,13 @@ import { Play, Pause } from 'lucide-react'
 import { getSupabase } from '../auth'
 
 interface VoiceMessageProps {
-  fileName: string
   bucket: string
   path: string
   duration: number
+  previewUrl?: string // Optional preview URL for unsaved voice messages
 }
 
-export default function VoiceMessage({ bucket, path, duration: initialDuration }: VoiceMessageProps) {
+export default function VoiceMessage({ bucket, path, duration: initialDuration, previewUrl }: VoiceMessageProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [duration, setDuration] = useState(initialDuration || 0)
   const [currentTime, setCurrentTime] = useState(0)
@@ -21,6 +21,13 @@ export default function VoiceMessage({ bucket, path, duration: initialDuration }
   const [signedUrl, setSignedUrl] = useState<string | null>(null)
 
   useEffect(() => {
+    // If we have a preview URL, use that instead of fetching a signed URL
+    if (previewUrl) {
+      setSignedUrl(previewUrl)
+      setIsLoading(false)
+      return
+    }
+
     const fetchSignedUrl = async () => {
       try {
         const supabase = getSupabase()
@@ -38,8 +45,10 @@ export default function VoiceMessage({ bucket, path, duration: initialDuration }
       }
     }
 
-    fetchSignedUrl()
-  }, [bucket, path])
+    if (path) {
+      fetchSignedUrl()
+    }
+  }, [bucket, path, previewUrl])
 
   useEffect(() => {
     if (!signedUrl) return
@@ -49,6 +58,9 @@ export default function VoiceMessage({ bucket, path, duration: initialDuration }
 
     const handleLoadedMetadata = () => {
       setIsLoading(false)
+      if (!initialDuration) {
+        setDuration(audio.duration)
+      }
     }
 
     const handleTimeUpdate = () => {
@@ -79,7 +91,7 @@ export default function VoiceMessage({ bucket, path, duration: initialDuration }
       audio.pause()
       audio.src = ''
     }
-  }, [signedUrl, duration])
+  }, [signedUrl, initialDuration])
 
   const togglePlayPause = async () => {
     if (!audioRef.current) return
@@ -112,6 +124,7 @@ export default function VoiceMessage({ bucket, path, duration: initialDuration }
         size="icon"
         className="w-8 h-8"
         disabled={isLoading || !signedUrl}
+        type="button"
       >
         {isPlaying ? (
           <Pause className="h-4 w-4" />

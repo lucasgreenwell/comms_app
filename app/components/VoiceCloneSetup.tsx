@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import VoiceRecorder from './VoiceRecorder'
@@ -27,20 +27,35 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
   const [recordings, setRecordings] = useState<Blob[]>([])
   const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Default to English if the language isn't supported
   const texts = SAMPLE_TEXTS[userLanguage as keyof typeof SAMPLE_TEXTS] || SAMPLE_TEXTS.en
 
   const handleRecordingComplete = (blob: Blob, duration: number) => {
+    setIsRecording(false)
+    const url = URL.createObjectURL(blob)
+    setPreviewUrl(url)
     const newRecordings = [...recordings, blob]
     setRecordings(newRecordings)
-    setCurrentStep(currentStep + 1)
   }
 
   const handleCancel = () => {
-    setRecordings(recordings.slice(0, -1))
-    setCurrentStep(Math.max(0, currentStep - 1))
+    setIsRecording(false)
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+    }
+  }
+
+  const handleSaveRecording = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl)
+      setPreviewUrl(null)
+    }
+    setCurrentStep(currentStep + 1)
   }
 
   const createVoiceClone = async () => {
@@ -124,11 +139,21 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
             <div className="p-4 bg-muted rounded-md mb-4">
               <p className="text-lg">{texts[currentStep]}</p>
             </div>
-            <VoiceRecorder
-              onRecordingComplete={handleRecordingComplete}
-              onCancel={handleCancel}
-              submitButtonText="Save Recording"
-            />
+            <div className="flex items-center gap-4">
+              <VoiceRecorder
+                onRecordingComplete={handleRecordingComplete}
+                onCancel={handleCancel}
+                className="w-10 h-10"
+              />
+              {previewUrl && (
+                <>
+                  <audio controls src={previewUrl} className="flex-1" />
+                  <Button onClick={handleSaveRecording}>
+                    Save Recording
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <div>

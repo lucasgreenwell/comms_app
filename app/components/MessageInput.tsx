@@ -1,24 +1,19 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { X, Paperclip, Mic } from 'lucide-react'
+import { X, Paperclip } from 'lucide-react'
 import { useToast } from "@/components/ui/use-toast"
 import { getSupabase } from '../auth'
 import VoiceRecorder from './VoiceRecorder'
+import VoiceMessage from './VoiceMessage'
 import type { FileAttachment } from '../types/entities/FileAttachment'
 
 interface MessageInputProps {
-  // The type of message being sent
   messageType: 'channel' | 'dm' | 'channel_thread' | 'dm_thread'
-  // The ID of the parent container (channel, conversation, or message)
   parentId: string
-  // Optional secondary ID (e.g., conversation_id for DM threads)
   secondaryId?: string
-  // Optional placeholder text
   placeholder?: string
-  // Optional class name for styling
   className?: string
-  // Optional participants array for checking bot conversations
   participants?: { id: string }[]
 }
 
@@ -32,10 +27,29 @@ export default function MessageInput({
 }: MessageInputProps) {
   const [newMessage, setNewMessage] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
   const [isBotTyping, setIsBotTyping] = useState(false)
+  const [voicePreview, setVoicePreview] = useState<{
+    blob: Blob,
+    url: string,
+    duration: number
+  } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  // Cleanup function for voice preview
+  const cleanupVoicePreview = () => {
+    if (voicePreview?.url) {
+      URL.revokeObjectURL(voicePreview.url)
+      setVoicePreview(null)
+    }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupVoicePreview()
+    }
+  }, [])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -47,86 +61,77 @@ export default function MessageInput({
   }
 
   const handleVoiceRecordingComplete = async (audioBlob: Blob, duration: number) => {
-    try {
-      const supabase = getSupabase()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
-
-      // Generate unique filename for the audio file
-      const fileName = `${Math.random().toString(36).substring(2)}.mp3`
-      const filePath = `${user.id}/${fileName}`
-
-      // Upload audio file to storage
-      const { error: uploadError } = await supabase.storage
-        .from('voice-messages')
-        .upload(filePath, audioBlob)
-
-      if (uploadError) throw uploadError
-
-      // Create file record with duration
-      const { data: fileData, error: fileRecordError } = await supabase
-        .from('files')
-        .insert({
-          file_name: fileName,
-          file_type: 'audio/mp3',
-          file_size: audioBlob.size,
-          bucket: 'voice-messages',
-          path: filePath,
-          uploaded_by: user.id,
-          duration_seconds: duration
-        })
-        .select()
-        .single()
-
-      if (fileRecordError) throw fileRecordError
-
-      // Create message/post/comment based on type
-      const messageData = await createMessage(user.id, '', [fileData])
-
-      setShowVoiceRecorder(false)
-      toast({
-        title: "Voice message sent",
-        description: "Your voice message has been sent successfully."
-      })
-
-      // Trigger translation
-      await triggerTranslation(messageData.id, user.id)
-
-    } catch (error) {
-      console.error('Error sending voice message:', error)
-      toast({
-        variant: "destructive",
-        title: "Error sending voice message",
-        description: "There was an error sending your voice message. Please try again."
-      })
-    }
+    // Create preview URL and save blob for later upload
+    const url = URL.createObjectURL(audioBlob)
+    setVoicePreview({
+      blob: audioBlob,
+      url,
+      duration
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() && selectedFiles.length === 0) return
+    if (!newMessage.trim() && selectedFiles.length === 0 && !voicePreview) return
+
+    // Cleanup voice preview immediately after submission begins
+    cleanupVoicePreview()
 
     try {
       const supabase = getSupabase()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Always send the original message first
-      const { data: message, error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          content: newMessage,
-          conversation_id: parentId,
-          sender_id: user.id
-        })
-        .select()
-        .single()
+      // Handle voice message upload if exists
+      if (voicePreview) {
+        const fileName = `${Math.random().toString(36).substring(2)}.mp3`
+        const filePath = `${user.id}/${fileName}`
 
-      if (messageError) throw messageError
+        // Upload voice message
+        const { error: uploadError } = await supabase.storage
+          .from('voice-messages')
+          .upload(filePath, voicePreview.blob)
 
-      // Handle file uploads if any
-      if (selectedFiles.length > 0) {
-        await handleFileUploads(message.id)
+        if (uploadError) throw uploadError
+
+        // Create file record
+        const { data: fileData, error: fileRecordError } = await supabase
+          .from('files')
+          .insert({
+            file_name: fileName,
+            file_type: 'audio/mp3',
+            file_size: voicePreview.blob.size,
+            bucket: 'voice-messages',
+            path: filePath,
+            uploaded_by: user.id,
+            duration_seconds: voicePreview.duration
+          })
+          .select()
+          .single()
+
+        if (fileRecordError) throw fileRecordError
+
+        // Create message with voice attachment
+        const messageData = await createMessage(user.id, newMessage, [fileData])
+        await triggerTranslation(messageData.id, user.id)
+      } else {
+        // Handle regular message with potential file attachments
+        const { data: message, error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            content: newMessage,
+            conversation_id: parentId,
+            sender_id: user.id
+          })
+          .select()
+          .single()
+
+        if (messageError) throw messageError
+
+        // Handle file uploads if any
+        if (selectedFiles.length > 0) {
+          await handleFileUploads(message.id)
+        }
       }
 
       // Clear input and files
@@ -152,7 +157,6 @@ export default function MessageInput({
           }),
         }).catch(error => {
           console.error('Error triggering AI response:', error)
-          // Don't show error to user since message was sent successfully
         })
       }
     } catch (error) {
@@ -345,15 +349,11 @@ export default function MessageInput({
             placeholder={placeholder}
             className="flex-1"
           />
-          <Button 
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => setShowVoiceRecorder(true)}
+          <VoiceRecorder
+            onRecordingComplete={handleVoiceRecordingComplete}
+            onCancel={cleanupVoicePreview}
             className="w-10 h-10"
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
+          />
           <Button 
             type="button"
             variant="outline"
@@ -364,12 +364,6 @@ export default function MessageInput({
           </Button>
           <Button type="submit">Send</Button>
         </div>
-        {showVoiceRecorder && (
-          <VoiceRecorder
-            onRecordingComplete={handleVoiceRecordingComplete}
-            onCancel={() => setShowVoiceRecorder(false)}
-          />
-        )}
         <input
           type="file"
           ref={fileInputRef}
@@ -377,24 +371,45 @@ export default function MessageInput({
           className="hidden"
           multiple
         />
-        {selectedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {selectedFiles.map((file, index) => (
-              <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
-                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-4 w-4 p-0"
-                  onClick={() => removeFile(index)}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="flex flex-col gap-2">
+          {voicePreview && (
+            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+              <VoiceMessage
+                bucket="voice-messages"
+                path=""
+                duration={voicePreview.duration}
+                previewUrl={voicePreview.url}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={cleanupVoicePreview}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0"
+                    onClick={() => removeFile(index)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </form>
     </div>
   )

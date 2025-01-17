@@ -296,6 +296,34 @@ interface TTSPlayerProps {
 />
 ```
 
+### MessageInput Component (`MessageInput.tsx`)
+
+#### Purpose
+Handles user input for sending messages, including text, file attachments, and voice messages.
+
+#### Key Features
+- Text input with placeholder support
+- File attachment handling with preview and removal
+- Voice message recording and preview before sending
+- Integration with AI response for direct messages
+
+#### Voice Message Preview
+- Users can record a voice message using the integrated `VoiceRecorder`.
+- A preview of the recorded voice message is displayed below the input field.
+- Users can play back the voice message to verify before sending.
+- The preview can be removed by clicking the delete button.
+- The voice message is uploaded and sent when the user clicks the send button.
+
+#### Usage Example
+```typescript
+<MessageInput
+  messageType="dm"
+  parentId="conversation-id"
+  placeholder="Type your message..."
+  participants={[{ id: 'user-id' }]}
+/>
+```
+
 ## Usage Examples
 
 ### MessageDisplay Component
