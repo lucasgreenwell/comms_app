@@ -14,12 +14,14 @@ import { toast } from 'react-hot-toast'
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { User } from '@supabase/supabase-js'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import VoiceCloneSetup from '@/app/components/VoiceCloneSetup'
 
 const THEME_STORAGE_KEY = 'slack-clone-theme'
 
 interface ExtendedUser extends User {
   display_name?: string | null;
   native_language?: string | null;
+  eleven_labs_clone_id?: string | null;
 }
 
 interface Language {
@@ -218,6 +220,10 @@ export default function ProfilePage() {
     }
   }
 
+  const handleVoiceCreated = async (voiceId: string) => {
+    await fetchUser() // Refresh user data to get the updated voice ID
+  }
+
   if (!user) return <div>Loading...</div>
 
   const initials = ((user.display_name || user.email) || '')
@@ -329,6 +335,30 @@ export default function ProfilePage() {
           ))}
         </RadioGroup>
       </Card>
+
+      {/* Add Voice Clone Setup */}
+      {user && !user.eleven_labs_clone_id && (
+        <div className="mb-6">
+          <VoiceCloneSetup
+            userId={user.id}
+            userLanguage={selectedLanguage || 'en'}
+            onVoiceCreated={handleVoiceCreated}
+          />
+        </div>
+      )}
+
+      {/* Show voice clone status if exists */}
+      {user?.eleven_labs_clone_id && (
+        <Card className="p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-2">Voice Clone Status</h2>
+          <p className="text-sm text-muted-foreground">
+            Your voice clone has been created and is ready to use.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Voice ID: {user.eleven_labs_clone_id}
+          </p>
+        </Card>
+      )}
 
       <Button onClick={handleLogout} variant="destructive">
         Logout

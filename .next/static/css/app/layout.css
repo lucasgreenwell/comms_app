@@ -862,6 +862,9 @@ video {
   width: 1rem;
   height: 1rem;
 }
+.h-1 {
+  height: 0.25rem;
+}
 .h-1\.5 {
   height: 0.375rem;
 }
@@ -930,9 +933,6 @@ video {
 }
 .h-svh {
   height: 100svh;
-}
-.h-1 {
-  height: 0.25rem;
 }
 .max-h-64 {
   max-height: 16rem;
@@ -1045,9 +1045,6 @@ video {
 .w-px {
   width: 1px;
 }
-.w-80 {
-  width: 20rem;
-}
 .min-w-0 {
   min-width: 0px;
 }
@@ -1090,6 +1087,9 @@ video {
 .max-w-\[200px\] {
   max-width: 200px;
 }
+.max-w-\[300px\] {
+  max-width: 300px;
+}
 .max-w-\[400px\] {
   max-width: 400px;
 }
@@ -1107,9 +1107,6 @@ video {
 }
 .max-w-sm {
   max-width: 24rem;
-}
-.max-w-\[300px\] {
-  max-width: 300px;
 }
 .flex-1 {
   flex: 1 1 0%;
@@ -1180,15 +1177,6 @@ video {
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
-@keyframes pulse {
-
-  50% {
-    opacity: .5;
-  }
-}
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
 @keyframes bounce {
 
   0%, 100% {
@@ -1203,6 +1191,15 @@ video {
 }
 .animate-bounce {
   animation: bounce 1s infinite;
+}
+@keyframes pulse {
+
+  50% {
+    opacity: .5;
+  }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 .cursor-default {
   cursor: default;
@@ -1227,9 +1224,6 @@ video {
 }
 .grid-cols-4 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.grid-cols-8 {
-  grid-template-columns: repeat(8, minmax(0, 1fr));
 }
 .flex-row {
   flex-direction: row;
@@ -2211,6 +2205,10 @@ body {
   background-color: hsl(var(--muted) / 0.5);
 }
 
+.hover\:bg-muted\/80:hover {
+  background-color: hsl(var(--muted) / 0.8);
+}
+
 .hover\:bg-primary:hover {
   background-color: hsl(var(--primary));
 }
@@ -2258,10 +2256,6 @@ body {
 .hover\:bg-zinc-700:hover {
   --tw-bg-opacity: 1;
   background-color: rgb(63 63 70 / var(--tw-bg-opacity, 1));
-}
-
-.hover\:bg-muted\/80:hover {
-  background-color: hsl(var(--muted) / 0.8);
 }
 
 .hover\:bg-opacity-15:hover {
@@ -3148,6 +3142,11 @@ body {
 
 .dark\:border-destructive:is(.dark *) {
   border-color: hsl(var(--destructive));
+}
+
+.dark\:bg-gray-800:is(.dark *) {
+  --tw-bg-opacity: 1;
+  background-color: rgb(31 41 55 / var(--tw-bg-opacity, 1));
 }
 
 .dark\:text-gray-300:is(.dark *) {

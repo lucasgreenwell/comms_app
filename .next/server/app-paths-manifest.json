@@ -1,6 +1,6 @@
 {
+  "/profile/page": "app/profile/page.js",
   "/dm/[id]/page": "app/dm/[id]/page.js",
   "/channel/[channelId]/page": "app/channel/[channelId]/page.js",
-  "/profile/login/page": "app/profile/login/page.js",
-  "/profile/page": "app/profile/page.js"
+  "/api/voice-clone/route": "app/api/voice-clone/route.js"
 }

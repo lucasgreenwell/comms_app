@@ -2,6 +2,7 @@
   "name": "my-v0-project",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -47,6 +48,7 @@
     "cmdk": "1.0.4",
     "dayjs": "^1.11.13",
     "dotenv": "^16.4.7",
+    "elevenlabs": "^1.50.2",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.454.0",
