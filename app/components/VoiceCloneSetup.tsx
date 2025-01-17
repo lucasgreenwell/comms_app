@@ -2,8 +2,10 @@ import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import VoiceRecorder from './VoiceRecorder'
+import VoiceMessage from './VoiceMessage'
 import { useToast } from '@/components/ui/use-toast'
 import { getSupabase } from '@/app/auth'
+import { X } from 'lucide-react'
 
 const SAMPLE_TEXTS = {
   en: [
@@ -23,43 +25,46 @@ interface VoiceCloneSetupProps {
   onVoiceCreated: (voiceId: string) => void
 }
 
+interface Recording {
+  blob: Blob
+  url: string
+  duration: number
+}
+
 export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }: VoiceCloneSetupProps) {
-  const [recordings, setRecordings] = useState<Blob[]>([])
+  const [recordings, setRecordings] = useState<(Recording | null)[]>([null, null])
   const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isRecording, setIsRecording] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const { toast } = useToast()
 
   // Default to English if the language isn't supported
   const texts = SAMPLE_TEXTS[userLanguage as keyof typeof SAMPLE_TEXTS] || SAMPLE_TEXTS.en
 
   const handleRecordingComplete = (blob: Blob, duration: number) => {
-    setIsRecording(false)
     const url = URL.createObjectURL(blob)
-    setPreviewUrl(url)
-    const newRecordings = [...recordings, blob]
+    const newRecordings = [...recordings]
+    newRecordings[currentStep] = { blob, url, duration }
     setRecordings(newRecordings)
-  }
-
-  const handleCancel = () => {
-    setIsRecording(false)
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
+    
+    // If we have completed all recordings, don't auto-advance
+    if (currentStep < texts.length - 1) {
+      setCurrentStep(currentStep + 1)
     }
   }
 
-  const handleSaveRecording = () => {
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
+  const handleCancel = (index: number) => {
+    const newRecordings = [...recordings]
+    if (newRecordings[index]?.url) {
+      URL.revokeObjectURL(newRecordings[index]!.url)
     }
-    setCurrentStep(currentStep + 1)
+    newRecordings[index] = null
+    setRecordings(newRecordings)
+    setCurrentStep(index)
   }
 
   const createVoiceClone = async () => {
-    if (recordings.length !== texts.length) {
+    const completedRecordings = recordings.filter((r): r is Recording => r !== null)
+    if (completedRecordings.length !== texts.length) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -71,8 +76,8 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
     setIsSubmitting(true)
     try {
       // Convert blobs to Files
-      const files = recordings.map((blob, index) => 
-        new File([blob], `sample_${index + 1}.mp3`, { type: 'audio/mp3' })
+      const files = completedRecordings.map((recording, index) => 
+        new File([recording.blob], `sample_${index + 1}.mp3`, { type: 'audio/mp3' })
       )
 
       // Create FormData
@@ -127,46 +132,70 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
       <div className="space-y-4">
         <div className="mb-4">
           <p className="text-sm text-muted-foreground">
-            Progress: {recordings.length} of {texts.length} recordings completed
+            Progress: {recordings.filter(r => r !== null).length} of {texts.length} recordings completed
           </p>
         </div>
 
-        {currentStep < texts.length ? (
-          <div>
-            <p className="mb-4">
-              Recording {currentStep + 1} of {texts.length}. Please read the following text:
-            </p>
-            <div className="p-4 bg-muted rounded-md mb-4">
-              <p className="text-lg">{texts[currentStep]}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <VoiceRecorder
-                onRecordingComplete={handleRecordingComplete}
-                onCancel={handleCancel}
-                className="w-10 h-10"
-              />
-              {previewUrl && (
-                <>
-                  <audio controls src={previewUrl} className="flex-1" />
-                  <Button onClick={handleSaveRecording}>
-                    Save Recording
+        <div>
+          {texts.map((text, index) => (
+            <div 
+              key={index} 
+              className={`p-4 mb-4 rounded-md ${
+                index === currentStep 
+                  ? 'bg-primary/10 border-2 border-primary' 
+                  : 'bg-muted'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <p className="text-lg flex-1">{text}</p>
+                <div className="flex flex-col items-center">
+                  <VoiceRecorder
+                    onRecordingComplete={(blob, duration) => {
+                      handleRecordingComplete(blob, duration)
+                      if (index < texts.length - 1) {
+                        setCurrentStep(index + 1)
+                      }
+                    }}
+                    onCancel={() => handleCancel(index)}
+                    className="w-10 h-10"
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {recordings[index] 
+                      ? "Re-record" 
+                      : "Record"}
+                  </p>
+                </div>
+              </div>
+              {recordings[index] && (
+                <div className="mt-4 flex items-center gap-2">
+                  <VoiceMessage
+                    bucket="voice-messages"
+                    path=""
+                    duration={recordings[index]!.duration}
+                    previewUrl={recordings[index]!.url}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={() => handleCancel(index)}
+                  >
+                    <X className="h-4 w-4" />
                   </Button>
-                </>
+                </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div>
-            <p className="mb-4">All recordings complete! Ready to create your voice clone.</p>
-            <Button 
-              onClick={createVoiceClone} 
-              disabled={isSubmitting || recordings.length !== texts.length}
-              className="w-full"
-            >
-              {isSubmitting ? "Creating Voice Clone..." : "Create Voice Clone"}
-            </Button>
-          </div>
-        )}
+          ))}
+        </div>
+
+        <Button 
+          onClick={createVoiceClone} 
+          disabled={isSubmitting || recordings.filter(r => r !== null).length !== texts.length}
+          className="w-full"
+        >
+          {isSubmitting ? "Creating Voice Clone..." : "Create Voice Clone"}
+        </Button>
       </div>
     </Card>
   )

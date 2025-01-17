@@ -18,6 +18,10 @@ export async function POST(request: NextRequest) {
 
     // If ElevenLabs returns an error, maintain the same error format
     if (!response.ok) {
+        console.log('ElevenLabs response:', {
+            status: response.status,
+            data
+          })
       return NextResponse.json(data, { status: response.status })
     }
 

@@ -9,35 +9,29 @@ const client = new ElevenLabsClient({
     apiKey: process.env.ELEVENLABS_API_KEY
 });
 
-async function deleteVoices() {
+async function getAllVoices() {
     try {
-        // Read the voices from the JSON file
-        const voicesData = JSON.parse(fs.readFileSync('elevenlabs_voices.json', 'utf8'));
+        console.log('Retrieving all voices from ElevenLabs...');
+        const response = await client.voices.getAll();
         
-        // Filter voices to delete (case-insensitive matching)
-        const voicesToDelete = voicesData.voices.filter(voice => {
-            const name = voice.name.toLowerCase();
-            return name === 'autumn' || name === 'lucas' || name === 'test-voice';
-        });
-
-        console.log(`Found ${voicesToDelete.length} voices to delete`);
-
-        // Delete each voice
-        for (const voice of voicesToDelete) {
-            try {
-                console.log(`Deleting voice: ${voice.name} (${voice.voice_id})`);
-                await client.voices.delete(voice.voice_id);
-                console.log(`Successfully deleted voice: ${voice.name}`);
-            } catch (error) {
-                console.error(`Error deleting voice ${voice.name}: ${error.message}`);
-            }
-        }
-
-        console.log('Voice deletion process completed');
+        // Filter voices to only include generated or cloned ones
+        const filteredVoices = {
+            voices: response.voices.filter(voice => 
+                voice.category === 'generated' || voice.category === 'cloned'
+            )
+        };
+        
+        // Save filtered voices to a JSON file
+        fs.writeFileSync('elevenlabs_voices.json', JSON.stringify(filteredVoices, null, 2));
+        
+        console.log('Voices saved successfully to elevenlabs_voices.json');
+        console.log(`Total voices retrieved: ${filteredVoices.voices.length}`);
+        console.log('Categories included: generated, cloned');
+        return filteredVoices;
     } catch (error) {
-        console.error('Error in deleteVoices:', error);
+        console.error('Error retrieving voices:', error);
     }
 }
 
 // Run the function
-deleteVoices();
+getAllVoices();
