@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import VoiceRecorder from './VoiceRecorder'
@@ -32,64 +32,19 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
   // Default to English if the language isn't supported
   const texts = SAMPLE_TEXTS[userLanguage as keyof typeof SAMPLE_TEXTS] || SAMPLE_TEXTS.en
 
-  useEffect(() => {
-    console.log('VoiceCloneSetup State:', {
-      currentStep,
-      recordingsCount: recordings.length,
-      totalRequired: texts.length,
-      isSubmitting
-    })
-  }, [currentStep, recordings, isSubmitting, texts.length])
-
   const handleRecordingComplete = (blob: Blob, duration: number) => {
-    console.log('Recording completed:', {
-      duration,
-      blobSize: blob.size,
-      currentRecordings: recordings.length,
-      currentStep
-    })
-
     const newRecordings = [...recordings, blob]
     setRecordings(newRecordings)
-    
-    console.log('After adding new recording:', {
-      newRecordingsCount: newRecordings.length,
-      requiredRecordings: texts.length,
-      willAdvanceStep: true
-    })
-    
-    // Always advance to next step, which will show the final screen when all recordings are done
     setCurrentStep(currentStep + 1)
   }
 
   const handleCancel = () => {
-    console.log('Cancelling recording:', {
-      currentStep,
-      recordingsBeforeCancel: recordings.length
-    })
-    
-    // Remove the last recording and go back a step
     setRecordings(recordings.slice(0, -1))
     setCurrentStep(Math.max(0, currentStep - 1))
-    
-    console.log('After cancel:', {
-      newStep: Math.max(0, currentStep - 1),
-      recordingsAfterCancel: recordings.length - 1
-    })
   }
 
   const createVoiceClone = async () => {
-    console.log('Starting voice clone creation:', {
-      recordingsCount: recordings.length,
-      requiredCount: texts.length,
-      userId
-    })
-
     if (recordings.length !== texts.length) {
-      console.log('Recordings count mismatch:', {
-        current: recordings.length,
-        required: texts.length
-      })
       toast({
         variant: "destructive",
         title: "Error",
@@ -101,15 +56,9 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
     setIsSubmitting(true)
     try {
       // Convert blobs to Files
-      const files = recordings.map((blob, index) => {
-        const file = new File([blob], `sample_${index + 1}.mp3`, { type: 'audio/mp3' })
-        console.log(`Created file ${index + 1}:`, {
-          name: file.name,
-          size: file.size,
-          type: file.type
-        })
-        return file
-      })
+      const files = recordings.map((blob, index) => 
+        new File([blob], `sample_${index + 1}.mp3`, { type: 'audio/mp3' })
+      )
 
       // Create FormData
       const formData = new FormData()
@@ -117,36 +66,19 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
       formData.append('name', `Voice_${userId}`)
       formData.append('description', 'Custom voice clone created from user recordings')
 
-      console.log('Sending request to voice clone API:', {
-        filesCount: files.length,
-        voiceName: `Voice_${userId}`
-      })
-
-      // Call our API route instead of ElevenLabs directly
+      // Call our API route
       const response = await fetch('/api/voice-clone', {
         method: 'POST',
         body: formData
       })
 
-      console.log('API response:', {
-        status: response.status,
-        ok: response.ok
-      })
-
       if (!response.ok) {
         const errorData = await response.json()
-        console.error('API error response:', errorData)
         throw new Error(errorData.detail?.message || 'Failed to create voice clone')
       }
 
       const data = await response.json()
-      console.log('API success response:', data)
       const voiceId = data.voice_id
-
-      console.log('Updating Supabase with voice ID:', {
-        userId,
-        voiceId
-      })
 
       // Save voice ID to user profile
       const supabase = getSupabase()
@@ -155,12 +87,8 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
         .update({ eleven_labs_clone_id: voiceId })
         .eq('id', userId)
 
-      if (error) {
-        console.error('Supabase update error:', error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log('Voice clone process completed successfully')
       toast({
         title: "Success",
         description: "Voice clone created successfully!"
@@ -168,7 +96,6 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
 
       onVoiceCreated(voiceId)
     } catch (error) {
-      console.error('Error in createVoiceClone:', error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -215,19 +142,6 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
             </Button>
           </div>
         )}
-
-        {/* Debug Info */}
-        <div className="mt-4 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-          <pre>
-            {JSON.stringify({
-              currentStep,
-              recordingsCount: recordings.length,
-              requiredRecordings: texts.length,
-              isSubmitting,
-              showingSubmitButton: currentStep >= texts.length
-            }, null, 2)}
-          </pre>
-        </div>
       </div>
     </Card>
   )

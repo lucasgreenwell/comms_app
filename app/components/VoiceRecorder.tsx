@@ -21,21 +21,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
   const startTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
-    console.log('VoiceRecorder State:', {
-      isRecording,
-      hasAudioBlob: !!audioBlob,
-      hasAudioUrl: !!audioUrl,
-      submitButtonText
-    })
-  }, [isRecording, audioBlob, audioUrl, submitButtonText])
-
-  useEffect(() => {
-    // Cleanup function to stop recording if component unmounts while recording
     return () => {
-      console.log('VoiceRecorder cleanup:', {
-        wasRecording: isRecording,
-        hadAudioUrl: !!audioUrl
-      })
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop()
       }
@@ -46,7 +32,6 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
   }, [isRecording, audioUrl])
 
   const startRecording = async () => {
-    console.log('Starting recording...')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
@@ -54,28 +39,14 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
       audioChunksRef.current = []
       startTimeRef.current = Date.now()
 
-      console.log('MediaRecorder initialized:', {
-        mimeType: mediaRecorder.mimeType,
-        state: mediaRecorder.state
-      })
-
       mediaRecorder.ondataavailable = (event) => {
-        console.log('Data available:', {
-          dataSize: event.data.size,
-          dataType: event.data.type
-        })
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data)
         }
       }
 
       mediaRecorder.onstop = () => {
-        console.log('MediaRecorder stopped, creating blob...')
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' })
-        console.log('Blob created:', {
-          size: audioBlob.size,
-          type: audioBlob.type
-        })
         setAudioBlob(audioBlob)
         const url = URL.createObjectURL(audioBlob)
         setAudioUrl(url)
@@ -84,9 +55,7 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
 
       mediaRecorder.start()
       setIsRecording(true)
-      console.log('Recording started')
     } catch (error) {
-      console.error('Error in startRecording:', error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -96,25 +65,15 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
   }
 
   const stopRecording = () => {
-    console.log('Stopping recording...')
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
-      console.log('Recording stopped')
     }
   }
 
   const handleSend = () => {
-    console.log('Handling send:', {
-      hasAudioBlob: !!audioBlob,
-      hasStartTime: !!startTimeRef.current
-    })
     if (audioBlob && startTimeRef.current) {
       const duration = (Date.now() - startTimeRef.current) / 1000
-      console.log('Sending recording:', {
-        duration,
-        blobSize: audioBlob.size
-      })
       onRecordingComplete(audioBlob, duration)
       // Clean up
       if (audioUrl) {
@@ -122,19 +81,16 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
       }
       setAudioBlob(null)
       setAudioUrl(null)
-      console.log('Recording sent and cleaned up')
     }
   }
 
   const handleCancel = () => {
-    console.log('Cancelling recording')
     if (audioUrl) {
       URL.revokeObjectURL(audioUrl)
     }
     setAudioBlob(null)
     setAudioUrl(null)
     onCancel()
-    console.log('Recording cancelled and cleaned up')
   }
 
   return (
@@ -177,19 +133,6 @@ export default function VoiceRecorder({ onRecordingComplete, onCancel, submitBut
           {submitButtonText}
         </Button>
       )}
-
-      {/* Debug Info */}
-      <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs">
-        <pre>
-          {JSON.stringify({
-            isRecording,
-            hasAudioBlob: !!audioBlob,
-            hasAudioUrl: !!audioUrl,
-            submitButtonText,
-            recordingStartTime: startTimeRef.current
-          }, null, 2)}
-        </pre>
-      </div>
     </div>
   )
 } 
