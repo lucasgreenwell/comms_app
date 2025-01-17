@@ -15,6 +15,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { User } from '@supabase/supabase-js'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import VoiceCloneSetup from '@/app/components/VoiceCloneSetup'
+import { Switch } from "@/components/ui/switch"
 
 const THEME_STORAGE_KEY = 'slack-clone-theme'
 
@@ -22,6 +23,7 @@ interface ExtendedUser extends User {
   display_name?: string | null;
   native_language?: string | null;
   eleven_labs_clone_id?: string | null;
+  ai_assistant_enabled?: boolean;
 }
 
 interface Language {
@@ -224,6 +226,26 @@ export default function ProfilePage() {
     await fetchUser() // Refresh user data to get the updated voice ID
   }
 
+  const handleAIAssistantToggle = async (value: boolean) => {
+    if (!user?.id) return
+    
+    try {
+      const supabase = getSupabase()
+      const { error } = await supabase
+        .from('users')
+        .update({ ai_assistant_enabled: value })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setUser({ ...user, ai_assistant_enabled: value })
+      toast.success('AI assistant updated successfully!')
+    } catch (error) {
+      console.error('Error updating AI assistant:', error)
+      toast.error('Failed to update AI assistant')
+    }
+  }
+
   if (!user) return <div>Loading...</div>
 
   const initials = ((user.display_name || user.email) || '')
@@ -277,6 +299,26 @@ export default function ProfilePage() {
               <Button type="submit" size="sm">
                 Update Name
               </Button>
+            </div>
+          </div>
+          <div className="mb-4">
+            <Label htmlFor="aiAssistant" className="block text-sm font-medium text-gray-700 mb-2">
+              AI Assistant
+            </Label>
+            <div className="flex items-center gap-2">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="aiAssistant"
+                    checked={user?.ai_assistant_enabled || false}
+                    onCheckedChange={handleAIAssistantToggle}
+                  />
+                  <Label htmlFor="aiAssistant">Have AI respond for you</Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  When enabled, an AI assistant will respond to messages on your behalf using your previous messages and posts as context.
+                </p>
+              </div>
             </div>
           </div>
           <div className="mb-4">

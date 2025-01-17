@@ -109,96 +109,105 @@ export default function MessageInput({
     try {
       const supabase = getSupabase()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('User not authenticated')
+      if (!user) return
 
-      // First, upload any files
-      const filePromises = selectedFiles.map(async (file: File) => {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-        const filePath = `${user.id}/${fileName}`
+      // Always send the original message first
+      const { data: message, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          content: newMessage,
+          conversation_id: parentId,
+          sender_id: user.id
+        })
+        .select()
+        .single()
 
-        // Upload file to storage
-        const { error: uploadError } = await supabase.storage
-          .from('file-uploads')
-          .upload(filePath, file)
+      if (messageError) throw messageError
 
-        if (uploadError) throw uploadError
+      // Handle file uploads if any
+      if (selectedFiles.length > 0) {
+        await handleFileUploads(message.id)
+      }
 
-        // Create file record
-        const { data: fileData, error: fileRecordError } = await supabase
-          .from('files')
-          .insert({
-            file_name: file.name,
-            file_type: file.type,
-            file_size: file.size,
-            bucket: 'file-uploads',
-            path: filePath,
-            uploaded_by: user.id
-          })
-          .select()
-          .single()
-
-        if (fileRecordError) throw fileRecordError
-
-        return fileData
-      })
-
-      const uploadedFiles = await Promise.all(filePromises)
-
-      // Create message/post/comment
-      const messageData = await createMessage(user.id, newMessage.trim(), uploadedFiles)
-
-      // Clear input and show success
+      // Clear input and files
       setNewMessage('')
       setSelectedFiles([])
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
 
-      // Check if this is a conversation with the bot user
-      const isBotConversation = participants.some(p => p.id === '54296b9b-091e-4a19-b5b9-b890c24c1912')
-      
-      if (isBotConversation && messageType === 'dm') {
-        // Show bot typing indicator
-        setIsBotTyping(true)
-        
-        // Send message to bot API
-        const botResponse = await fetch('/api/bot-messages', {
+      // For DMs, trigger AI response in the background
+      if (messageType === 'dm' && participants.length === 1) {
+        const recipient = participants[0]
+        fetch('/api/ai-response', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            content: newMessage.trim(),
+            content: newMessage,
             conversationId: parentId,
-            senderId: user.id
+            senderId: user.id,
+            recipientId: recipient.id
           }),
+        }).catch(error => {
+          console.error('Error triggering AI response:', error)
+          // Don't show error to user since message was sent successfully
         })
-
-        if (!botResponse.ok) {
-          throw new Error('Failed to get bot response')
-        }
-
-        // Hide bot typing indicator
-        setIsBotTyping(false)
       }
-
-      toast({
-        title: "Message sent",
-        description: "Your message has been sent successfully."
-      })
-
-      // Trigger translation
-      await triggerTranslation(messageData.id, user.id)
-
     } catch (error) {
-      setIsBotTyping(false)
       console.error('Error sending message:', error)
       toast({
         variant: "destructive",
         title: "Error sending message",
         description: "There was an error sending your message. Please try again."
       })
+    }
+  }
+
+  const handleFileUploads = async (messageId: string) => {
+    const supabase = getSupabase()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // Upload each file
+    for (const file of selectedFiles) {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const filePath = `${user.id}/${fileName}`
+
+      // Upload file to storage
+      const { error: uploadError } = await supabase.storage
+        .from('file-uploads')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      // Create file record
+      const { data: fileData, error: fileRecordError } = await supabase
+        .from('files')
+        .insert({
+          file_name: file.name,
+          file_type: file.type,
+          file_size: file.size,
+          bucket: 'file-uploads',
+          path: filePath,
+          uploaded_by: user.id
+        })
+        .select()
+        .single()
+
+      if (fileRecordError) throw fileRecordError
+
+      // Create file attachment
+      const { error: attachmentError } = await supabase
+        .from('file_attachments')
+        .insert({
+          file_id: fileData.id,
+          message_id: messageId
+        })
+
+      if (attachmentError) throw attachmentError
     }
   }
 

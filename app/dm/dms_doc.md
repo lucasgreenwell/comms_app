@@ -429,10 +429,20 @@ Each error is caught and displayed to the user via toast notifications.
 ## Bot Conversations
 
 ### Overview
-The application includes an AI assistant bot (ID: '54296b9b-091e-4a19-b5b9-b890c24c1912') that uses Retrieval-Augmented Generation (RAG) to provide context-aware responses. The bot can access and reference content from channels the user is a member of and conversations they're participating in.
+The application includes two types of AI assistance:
+1. A dedicated AI assistant bot (ID: '54296b9b-091e-4a19-b5b9-b890c24c1912') that uses Retrieval-Augmented Generation (RAG) to provide context-aware responses.
+2. Personal AI assistants that can respond on behalf of users when they enable the feature in their profile settings.
+
+### Personal AI Assistant
+Users can enable an AI assistant to respond on their behalf in direct messages. When enabled:
+- The AI assistant uses the user's previous messages, posts, and comments as context
+- Responses are prefixed with "[User]'s AI Assistant:"
+- Responses match the user's communication style based on their historical content
+- Messages are sent in the user's preferred language
+- The assistant respects user permissions and only accesses content the user has created
 
 ### RAG Implementation
-The bot uses a comprehensive vector search across multiple content types:
+Both the bot and personal assistants use comprehensive vector search across multiple content types:
 - Channel posts
 - Post thread comments
 - Direct messages
