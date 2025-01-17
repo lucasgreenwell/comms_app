@@ -20,32 +20,72 @@ interface ContentItem {
   id: string;
   content: string;
   type: ContentType;
+  user_id: string;
 }
 
 async function fetchContentWithoutTTS(supabaseClient: any): Promise<ContentItem[]> {
   const results: ContentItem[] = [];
 
-  // Fetch posts
+  // Fetch posts with user_id
   const { data: posts, error: postsError } = await supabaseClient.rpc('posts_without_tts');
   if (postsError) throw postsError;
-  results.push(...posts.map(p => ({ ...p, type: 'post' as ContentType })));
+  results.push(...posts.filter(p => p.content?.trim()).map(p => ({ ...p, type: 'post' as ContentType })));
 
-  // Fetch messages
+  // Fetch messages with user_id
   const { data: messages, error: messagesError } = await supabaseClient.rpc('messages_without_tts');
   if (messagesError) throw messagesError;
-  results.push(...messages.map(m => ({ ...m, type: 'message' as ContentType })));
+  results.push(...messages.filter(m => m.content?.trim()).map(m => ({ ...m, type: 'message' as ContentType })));
 
-  // Fetch post thread comments
+  // Fetch post thread comments with user_id
   const { data: postComments, error: postCommentsError } = await supabaseClient.rpc('post_thread_comments_without_tts');
   if (postCommentsError) throw postCommentsError;
-  results.push(...postComments.map(pc => ({ ...pc, type: 'post_thread_comment' as ContentType })));
+  results.push(...postComments.filter(pc => pc.content?.trim()).map(pc => ({ ...pc, type: 'post_thread_comment' as ContentType })));
 
-  // Fetch conversation thread comments
+  // Fetch conversation thread comments with user_id
   const { data: convComments, error: convCommentsError } = await supabaseClient.rpc('conversation_thread_comments_without_tts');
   if (convCommentsError) throw convCommentsError;
-  results.push(...convComments.map(cc => ({ ...cc, type: 'conversation_thread_comment' as ContentType })));
+  results.push(...convComments.filter(cc => cc.content?.trim()).map(cc => ({ ...cc, type: 'conversation_thread_comment' as ContentType })));
 
   return results;
+}
+
+async function getUserVoiceClone(supabaseClient: any, userId: string): Promise<string | null> {
+  const { data, error } = await supabaseClient
+    .from('users')
+    .select('eleven_labs_clone_id')
+    .eq('id', userId)
+    .single();
+
+  if (error || !data) return null;
+  return data.eleven_labs_clone_id;
+}
+
+async function generateTTSWithElevenLabs(text: string, voiceId: string): Promise<ArrayBuffer> {
+  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': Deno.env.get('ELEVENLABS_API_KEY') || '',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: {
+        stability: 0.5,
+        similarity_boost: 0.75
+      }
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      `Failed to generate TTS with ElevenLabs: ${response.status} ${response.statusText}` +
+      (errorData ? ` - ${JSON.stringify(errorData)}` : '')
+    );
+  }
+
+  return await response.arrayBuffer();
 }
 
 serve(async (req: Request) => {
@@ -79,6 +119,18 @@ serve(async (req: Request) => {
 
     for (const item of items) {
       try {
+        // Validate content before processing
+        if (!item.content?.trim()) {
+          console.error(`Empty content found for ${item.type} ${item.id}`);
+          results.push({ 
+            content_type: item.type, 
+            content_id: item.id, 
+            status: 'failed', 
+            error: 'Empty content' 
+          });
+          continue;
+        }
+
         // Create data object for TTS recording entry
         const data: Record<string, any> = {
           status: 'processing',
@@ -110,15 +162,22 @@ serve(async (req: Request) => {
 
         if (ttsError) throw ttsError
 
-        // Call OpenAI's TTS API
-        const response = await openai.audio.speech.create({
-          model: "tts-1",
-          voice: "alloy",
-          input: item.content,
-        })
+        // Check if user has a voice clone
+        const voiceCloneId = await getUserVoiceClone(supabaseClient, item.user_id);
+        let audioBuffer: ArrayBuffer;
 
-        // Convert the response to a Buffer
-        const audioBuffer = await response.arrayBuffer()
+        if (voiceCloneId) {
+          // Use ElevenLabs if user has a voice clone
+          audioBuffer = await generateTTSWithElevenLabs(item.content, voiceCloneId);
+        } else {
+          // Fall back to OpenAI TTS if no voice clone
+          const response = await openai.audio.speech.create({
+            model: "tts-1",
+            voice: "alloy",
+            input: item.content,
+          });
+          audioBuffer = await response.arrayBuffer();
+        }
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabaseClient
