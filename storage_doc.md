@@ -113,6 +113,16 @@ This bucket stores user-recorded voice messages and audio recordings.
 - Includes cleanup of storage items when associated content is deleted
 - TTS recordings are managed by the system and cleaned up automatically
 
+### Automated Cleanup
+- Runs every 15 minutes via edge function
+- Scans all buckets recursively (including subdirectories)
+- Removes files that are no longer referenced in their respective tables:
+  - `profile-pics`: Removes files not referenced in `user_profiles.profile_pic_url`
+  - `file-uploads` and `voice-messages`: Removes files not referenced in `files` table
+  - `tts_recordings`: Removes files not referenced in `tts_recordings` table or failed recordings older than 24 hours
+- Provides detailed logging of cleanup operations
+- Uses service role key for secure access to private buckets
+
 ## Security Considerations
 
 - Profile pictures are associated with user IDs
@@ -120,6 +130,7 @@ This bucket stores user-recorded voice messages and audio recordings.
 - Public URLs are used for serving content
 - Error handling is implemented across all storage operations
 - Audio content is properly sanitized and validated
+- Automated cleanup uses service role for secure access
 
 ## Best Practices
 

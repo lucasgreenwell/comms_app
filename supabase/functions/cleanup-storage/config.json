@@ -1,0 +1,6 @@
+{
+  "name": "cleanup-storage",
+  "version": "1",
+  "description": "Cleans up orphaned files in storage buckets",
+  "verify_jwt": true
+} 
