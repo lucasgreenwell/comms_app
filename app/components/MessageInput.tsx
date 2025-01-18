@@ -36,6 +36,8 @@ export default function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
+  const BOT_USER_ID = '54296b9b-091e-4a19-b5b9-b890c24c1912'
+
   // Cleanup function for voice preview
   const cleanupVoicePreview = () => {
     if (voicePreview?.url) {
@@ -137,10 +139,19 @@ export default function MessageInput({
         await triggerTranslation(messageData.id, user.id)
       }
 
-      // For DMs, trigger AI response in the background
+      // For DMs, trigger appropriate AI response in the background
       if (messageType === 'dm' && participants.length === 1) {
         const recipient = participants[0]
-        fetch('/api/ai-response', {
+        
+        // Set typing indicator if messaging the bot
+        if (recipient.id === BOT_USER_ID) {
+          setIsBotTyping(true)
+        }
+
+        // Choose the appropriate endpoint based on recipient
+        const endpoint = recipient.id === BOT_USER_ID ? '/api/bot-messages' : '/api/ai-response'
+        
+        fetch(endpoint, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -151,8 +162,25 @@ export default function MessageInput({
             senderId: user.id,
             recipientId: recipient.id
           }),
-        }).catch(error => {
+        })
+        .then(response => response.json())
+        .then(() => {
+          // Clear typing indicator after response is received
+          if (recipient.id === BOT_USER_ID) {
+            setIsBotTyping(false)
+          }
+        })
+        .catch(error => {
           console.error('Error triggering AI response:', error)
+          // Clear typing indicator on error
+          if (recipient.id === BOT_USER_ID) {
+            setIsBotTyping(false)
+          }
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Failed to get AI response. Please try again."
+          })
         })
       }
     } catch (error) {
