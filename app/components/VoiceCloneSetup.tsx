@@ -5,7 +5,8 @@ import VoiceRecorder from './VoiceRecorder'
 import VoiceMessage from './VoiceMessage'
 import { useToast } from '@/components/ui/use-toast'
 import { getSupabase } from '@/app/auth'
-import { X } from 'lucide-react'
+import { X, Mic } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 const SAMPLE_TEXTS = {
   en: [
@@ -36,6 +37,7 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
   const [currentStep, setCurrentStep] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   // Default to English if the language isn't supported
   const texts = SAMPLE_TEXTS[userLanguage as keyof typeof SAMPLE_TEXTS] || SAMPLE_TEXTS.en
@@ -115,6 +117,7 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
       })
 
       onVoiceCreated(voiceId)
+      router.refresh()
     } catch (error) {
       toast({
         variant: "destructive",
@@ -127,76 +130,104 @@ export default function VoiceCloneSetup({ userId, userLanguage, onVoiceCreated }
   }
 
   return (
-    <Card className="p-6">
-      <h2 className="text-lg font-semibold mb-4">Create Your Voice Clone</h2>
-      <div className="space-y-4">
-        <div className="mb-4">
-          <p className="text-sm text-muted-foreground">
-            Progress: {recordings.filter(r => r !== null).length} of {texts.length} recordings completed
-          </p>
-        </div>
+    <div className="space-y-4 max-h-[80vh] overflow-y-auto">
+      <div>
+        <h2 className="text-2xl font-semibold flex items-center gap-2">
+          <Mic className="w-5 h-5 text-muted-foreground" />
+          Create Your Voice Clone
+        </h2>
+      </div>
 
-        <div>
-          {texts.map((text, index) => (
+      <div className="bg-muted/50 p-3 rounded-lg space-y-2">
+        <h3 className="font-medium">Instructions:</h3>
+        <ol className="list-decimal list-inside space-y-1 text-sm">
+          <li>Find a quiet place with minimal background noise</li>
+          <li>Click the microphone button and read the text out loud clearly</li>
+          <li>Try to maintain a natural speaking pace and tone</li>
+          <li>You can preview your recording and re-record if needed</li>
+          <li>Complete both recordings to create your voice clone</li>
+        </ol>
+      </div>
+
+      <div className="mb-2">
+        <p className="text-sm text-muted-foreground">
+          Progress: {recordings.filter(r => r !== null).length} of {texts.length} recordings completed
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        {texts.map((text, index) => {
+          const isDisabled = index > 0 && !recordings[index - 1];
+          const isCompleted = recordings[index] !== null;
+          return (
             <div 
               key={index} 
-              className={`p-4 mb-4 rounded-md ${
-                index === currentStep 
-                  ? 'bg-primary/10 border-2 border-primary' 
-                  : 'bg-muted'
+              className={`p-3 rounded-lg border-2 ${
+                isDisabled
+                  ? 'opacity-50 cursor-not-allowed'
+                  : isCompleted
+                    ? 'bg-background border-muted'
+                    : 'bg-primary/5 border-primary'
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <p className="text-lg flex-1">{text}</p>
-                <div className="flex flex-col items-center">
-                  <VoiceRecorder
-                    onRecordingComplete={(blob, duration) => {
-                      handleRecordingComplete(blob, duration)
-                      if (index < texts.length - 1) {
-                        setCurrentStep(index + 1)
-                      }
-                    }}
-                    onCancel={() => handleCancel(index)}
-                    className="w-10 h-10"
-                  />
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {recordings[index] 
-                      ? "Re-record" 
-                      : "Record"}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Recording {index + 1}</span>
+                  <div className="flex items-center gap-2">
+                    <VoiceRecorder
+                      onRecordingComplete={(blob, duration) => {
+                        handleRecordingComplete(blob, duration)
+                        if (index < texts.length - 1) {
+                          setCurrentStep(index + 1)
+                        }
+                      }}
+                      onCancel={() => handleCancel(index)}
+                      className="w-10 h-10"
+                      disabled={isDisabled}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {recordings[index] ? "Re-record" : "Record"}
+                    </span>
+                  </div>
                 </div>
-              </div>
-              {recordings[index] && (
-                <div className="mt-4 flex items-center gap-2">
-                  <VoiceMessage
-                    bucket="voice-messages"
-                    path=""
-                    duration={recordings[index]!.duration}
-                    previewUrl={recordings[index]!.url}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleCancel(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
 
-        <Button 
-          onClick={createVoiceClone} 
-          disabled={isSubmitting || recordings.filter(r => r !== null).length !== texts.length}
-          className="w-full"
-        >
-          {isSubmitting ? "Creating Voice Clone..." : "Create Voice Clone"}
-        </Button>
+                <div className={`bg-muted p-3 rounded-md ${isDisabled ? 'opacity-50' : ''}`}>
+                  <p className="text-lg">{text}</p>
+                </div>
+
+                {recordings[index] && (
+                  <div className="flex items-center gap-2">
+                    <VoiceMessage
+                      bucket="voice-messages"
+                      path=""
+                      duration={recordings[index]!.duration}
+                      previewUrl={recordings[index]!.url}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => handleCancel(index)}
+                      disabled={isDisabled}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
-    </Card>
+
+      <Button 
+        onClick={createVoiceClone} 
+        disabled={isSubmitting || recordings.filter(r => r !== null).length !== texts.length}
+        className="w-full"
+      >
+        {isSubmitting ? "Creating Voice Clone..." : "Create Voice Clone"}
+      </Button>
+    </div>
   )
 } 

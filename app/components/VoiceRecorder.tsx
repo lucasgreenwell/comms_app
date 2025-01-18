@@ -9,88 +9,81 @@ interface VoiceRecorderProps {
   onRecordingComplete: (blob: Blob, duration: number) => void
   onCancel: () => void
   className?: string
+  disabled?: boolean
 }
 
-export default function VoiceRecorder({ onRecordingComplete, onCancel, className = "" }: VoiceRecorderProps) {
+export default function VoiceRecorder({ onRecordingComplete, onCancel, className, disabled }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
+  const chunksRef = useRef<Blob[]>([])
+  const startTimeRef = useRef<number>(0)
   const { toast } = useToast()
-  const startTimeRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {
       if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop()
       }
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl)
-      }
     }
-  }, [isRecording, audioUrl])
+  }, [isRecording])
 
   const startRecording = async () => {
     try {
+      setIsProcessing(true)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mediaRecorder = new MediaRecorder(stream)
       mediaRecorderRef.current = mediaRecorder
-      audioChunksRef.current = []
-      startTimeRef.current = Date.now()
+      chunksRef.current = []
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data)
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data)
         }
       }
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/mp3' })
-        setAudioBlob(audioBlob)
-        const url = URL.createObjectURL(audioBlob)
-        setAudioUrl(url)
+        const duration = (Date.now() - startTimeRef.current) / 1000
+        const blob = new Blob(chunksRef.current, { type: 'audio/mp3' })
+        onRecordingComplete(blob, duration)
         stream.getTracks().forEach(track => track.stop())
-        
-        // Automatically send the recording when stopped
-        if (startTimeRef.current) {
-          const duration = (Date.now() - startTimeRef.current) / 1000
-          onRecordingComplete(audioBlob, duration)
-          // Clean up
-          URL.revokeObjectURL(url)
-          setAudioBlob(null)
-          setAudioUrl(null)
-        }
+        setIsProcessing(false)
+        setIsRecording(false)
       }
 
+      startTimeRef.current = Date.now()
       mediaRecorder.start()
       setIsRecording(true)
+      setIsProcessing(false)
     } catch (error) {
+      console.error('Error starting recording:', error)
       toast({
         variant: "destructive",
         title: "Error",
         description: "Could not access microphone. Please check your browser permissions."
       })
       onCancel()
+      setIsProcessing(false)
     }
   }
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop()
-      setIsRecording(false)
     }
   }
 
   return (
     <Button
-      onClick={isRecording ? stopRecording : startRecording}
-      variant="outline"
+      type="button"
       size="icon"
+      variant={isRecording ? "destructive" : "secondary"}
       className={className}
+      onClick={isRecording ? stopRecording : startRecording}
+      disabled={disabled || isProcessing}
     >
       {isRecording ? (
-        <Square className="h-4 w-4 text-destructive" />
+        <Square className="h-4 w-4" />
       ) : (
         <Mic className="h-4 w-4" />
       )}
