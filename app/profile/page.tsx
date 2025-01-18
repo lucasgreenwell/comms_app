@@ -106,7 +106,8 @@ export default function ProfilePage() {
       const extendedUser: ExtendedUser = {
         ...currentUser,
         display_name: userData.display_name,
-        native_language: userData.native_language
+        native_language: userData.native_language,
+        ai_assistant_enabled: userData.ai_assistant_enabled
       }
 
       setUser(extendedUser)
