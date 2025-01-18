@@ -74,6 +74,17 @@ export default function MessageInput({
     e.preventDefault()
     if (!newMessage.trim() && selectedFiles.length === 0 && !voicePreview) return
 
+    // Store message content and files before clearing
+    const messageContent = newMessage
+    const filesToUpload = [...selectedFiles]
+
+    // Clear input and files immediately
+    setNewMessage('')
+    setSelectedFiles([])
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+
     // Cleanup voice preview immediately after submission begins
     cleanupVoicePreview()
 
@@ -112,33 +123,18 @@ export default function MessageInput({
         if (fileRecordError) throw fileRecordError
 
         // Create message with voice attachment
-        const messageData = await createMessage(user.id, newMessage, [fileData])
+        const messageData = await createMessage(user.id, messageContent, [fileData])
         await triggerTranslation(messageData.id, user.id)
       } else {
         // Handle regular message with potential file attachments
-        const { data: message, error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            content: newMessage,
-            conversation_id: parentId,
-            sender_id: user.id
-          })
-          .select()
-          .single()
-
-        if (messageError) throw messageError
+        const messageData = await createMessage(user.id, messageContent, [])
 
         // Handle file uploads if any
-        if (selectedFiles.length > 0) {
-          await handleFileUploads(message.id)
+        if (filesToUpload.length > 0) {
+          await handleFileUploads(messageData.id)
         }
-      }
 
-      // Clear input and files
-      setNewMessage('')
-      setSelectedFiles([])
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        await triggerTranslation(messageData.id, user.id)
       }
 
       // For DMs, trigger AI response in the background
@@ -150,7 +146,7 @@ export default function MessageInput({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            content: newMessage,
+            content: messageContent,
             conversationId: parentId,
             senderId: user.id,
             recipientId: recipient.id
@@ -166,6 +162,15 @@ export default function MessageInput({
         title: "Error sending message",
         description: "There was an error sending your message. Please try again."
       })
+      // Restore the message content and files if there was an error
+      setNewMessage(messageContent)
+      setSelectedFiles(filesToUpload)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''  // Clear and re-trigger change event
+        const dataTransfer = new DataTransfer()
+        filesToUpload.forEach(file => dataTransfer.items.add(file))
+        fileInputRef.current.files = dataTransfer.files
+      }
     }
   }
 
